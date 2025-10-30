@@ -1,0 +1,48 @@
+"""
+Votelytics API - FastAPI Application
+Electoral predictions and analysis platform
+"""
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.config import settings
+
+# Create FastAPI app instance
+app = FastAPI(
+    title="Votelytics API",
+    description="Electoral predictions and historical election data API",
+    version="1.0.0",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+)
+
+# CORS middleware - allow frontend to call API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/")
+async def root():
+    """Root endpoint - API health check"""
+    return {
+        "message": "Welcome to Votelytics API",
+        "status": "active",
+        "version": "1.0.0",
+    }
+
+
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy"}
+
+
+# TODO: Import and include routers
+# from app.api import constituencies, elections, predictions
+# app.include_router(constituencies.router, prefix="/api/constituencies", tags=["Constituencies"])
+# app.include_router(elections.router, prefix="/api/elections", tags=["Elections"])
+# app.include_router(predictions.router, prefix="/api/predictions", tags=["Predictions"])
