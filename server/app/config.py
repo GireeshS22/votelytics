@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str = "your-secret-key-change-in-production"
 
+    # Supabase settings (optional - for future features like auth, storage)
+    SUPABASE_URL: str = ""
+    SUPABASE_ANON_KEY: str = ""
+
     class Config:
         env_file = ".env"
         case_sensitive = True
