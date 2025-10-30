@@ -2,13 +2,16 @@
  * Home page - displays the interactive Tamil Nadu map
  */
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { constituenciesAPI } from '../services/api';
+import TNMap from '../components/map/TNMap';
 import type { Constituency } from '../types/constituency';
 
 function Home() {
   const [constituencies, setConstituencies] = useState<Constituency[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadConstituencies();
@@ -21,17 +24,25 @@ function Home() {
       setConstituencies(data.constituencies);
       setError(null);
     } catch (err) {
-      setError('Failed to load constituencies');
+      setError('Failed to load constituencies. Make sure the backend is running.');
       console.error('Error loading constituencies:', err);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleConstituencyClick = (constituency: Constituency) => {
+    console.log('Constituency clicked:', constituency);
+    // navigate(`/constituency/${constituency.id}`);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl">Loading Tamil Nadu constituencies...</div>
+        <div className="text-center">
+          <div className="text-xl font-semibold mb-2">Loading Votelytics...</div>
+          <div className="text-gray-600">Fetching Tamil Nadu constituencies</div>
+        </div>
       </div>
     );
   }
@@ -39,51 +50,54 @@ function Home() {
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl text-red-600">{error}</div>
+        <div className="text-center max-w-md">
+          <div className="text-xl font-semibold text-red-600 mb-2">Error</div>
+          <div className="text-gray-600">{error}</div>
+          <button
+            onClick={loadConstituencies}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-800 mb-2">
-          Tamil Nadu Elections 2026
-        </h1>
-        <p className="text-gray-600">
-          Explore constituencies, historical results, and predictions
-        </p>
+    <div className="h-screen flex flex-col">
+      {/* Map Container */}
+      <div className="flex-1">
+        <TNMap
+          constituencies={constituencies}
+          onConstituencyClick={handleConstituencyClick}
+        />
       </div>
 
-      {/* Temporary: Show constituency list */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {constituencies.map((constituency) => (
-          <div
-            key={constituency.id}
-            className="p-4 border rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer"
-          >
-            <h3 className="text-lg font-semibold text-gray-800">
-              {constituency.name}
-            </h3>
-            <p className="text-sm text-gray-600">
-              {constituency.district} • {constituency.region}
-            </p>
-            <div className="mt-2 text-sm text-gray-500">
-              <div>Population: {constituency.population?.toLocaleString() || 'N/A'}</div>
-              <div>Literacy: {constituency.literacy_rate || 'N/A'}%</div>
+      {/* Bottom Stats Bar */}
+      <div className="bg-white border-t shadow-lg">
+        <div className="container mx-auto px-4 py-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div>
+              <div className="text-2xl font-bold text-blue-600">
+                {constituencies.length}
+              </div>
+              <div className="text-sm text-gray-600">Constituencies</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-green-600">234</div>
+              <div className="text-sm text-gray-600">Total Seats</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-purple-600">2026</div>
+              <div className="text-sm text-gray-600">Next Election</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-orange-600">6.3 Cr</div>
+              <div className="text-sm text-gray-600">Voters</div>
             </div>
           </div>
-        ))}
-      </div>
-
-      {/* TODO: Replace with actual Leaflet map */}
-      <div className="mt-8 p-8 bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg text-center">
-        <p className="text-lg text-gray-700">
-          🗺️ Interactive Tamil Nadu Map will appear here
-        </p>
-        <p className="text-sm text-gray-500 mt-2">
-          Next: We'll add Leaflet map with clickable constituencies
-        </p>
+        </div>
       </div>
     </div>
   );
