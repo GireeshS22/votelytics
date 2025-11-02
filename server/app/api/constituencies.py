@@ -1,5 +1,5 @@
 """API endpoints for constituencies"""
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
@@ -11,12 +11,17 @@ from app.schemas.constituency import (
     ConstituencyCreate,
     ConstituencyUpdate,
 )
+from app.api.dependencies import verify_admin_key
+from app.rate_limiters import limiter
+from app.config import settings
 
 router = APIRouter()
 
 
 @router.get("/", response_model=ConstituencyList)
-def get_constituencies(
+@limiter.limit(settings.RATE_LIMIT_PUBLIC)
+async def get_constituencies(
+    request: Request,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     district: Optional[str] = None,
@@ -30,6 +35,8 @@ def get_constituencies(
     - **limit**: Maximum number of records to return
     - **district**: Filter by district name
     - **region**: Filter by region (North, South, Central, West)
+
+    **Rate limit**: 100 requests per minute
     """
     query = db.query(Constituency)
 
@@ -78,12 +85,22 @@ def get_constituency_by_code(code: str, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=ConstituencyResponse, status_code=201)
-def create_constituency(
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def create_constituency(
+    request: Request,
     constituency: ConstituencyCreate,
     db: Session = Depends(get_db),
+    admin_key: str = Depends(verify_admin_key),
 ):
     """
-    Create a new constituency (admin only - to be protected with auth)
+    Create a new constituency (admin only - requires admin API key)
+
+    Requires: X-Admin-Key header with valid admin API key
+
+    **Security**: This endpoint is protected and requires admin authentication.
+    Include the admin API key in request headers as 'X-Admin-Key'.
+
+    **Rate limit**: 500 requests per minute (admin operations)
     """
     # Check if constituency with same code already exists
     existing = db.query(Constituency).filter(Constituency.code == constituency.code).first()

@@ -1,5 +1,5 @@
 """API endpoints for elections and results"""
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 from collections import defaultdict
@@ -12,12 +12,16 @@ from app.schemas.election import (
     ElectionResultResponse,
     ConstituencyElectionHistory,
 )
+from app.config import settings
+from app.rate_limiters import limiter
 
 router = APIRouter()
 
 
 @router.get("/", response_model=List[ElectionResponse])
-def get_elections(
+@limiter.limit(settings.RATE_LIMIT_PUBLIC)
+async def get_elections(
+    request: Request,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     year: Optional[int] = None,
@@ -31,6 +35,8 @@ def get_elections(
     - **limit**: Maximum number of records to return
     - **year**: Filter by election year
     - **election_type**: Filter by type (Assembly, Lok Sabha)
+
+    **Rate limit**: 100 requests per minute
     """
     query = db.query(Election)
 
@@ -204,7 +210,9 @@ def get_election(election_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{election_id}/results", response_model=List[ElectionResultResponse])
-def get_election_results(
+@limiter.limit(settings.RATE_LIMIT_HEAVY)
+async def get_election_results(
+    request: Request,
     election_id: int,
     skip: int = Query(0, ge=0),
     limit: int = Query(234, ge=1, le=500),
@@ -218,6 +226,8 @@ def get_election_results(
     - **election_id**: ID of the election
     - **party**: Filter by party name
     - **winner_only**: If True, only return winning candidates
+
+    **Rate limit**: 20 requests per minute (heavy query)
     """
     # Check if election exists
     election = db.query(Election).filter(Election.id == election_id).first()
