@@ -11,6 +11,7 @@ from app.schemas.constituency import (
     ConstituencyCreate,
     ConstituencyUpdate,
 )
+from app.api.dependencies import verify_admin_key
 
 router = APIRouter()
 
@@ -81,9 +82,15 @@ def get_constituency_by_code(code: str, db: Session = Depends(get_db)):
 def create_constituency(
     constituency: ConstituencyCreate,
     db: Session = Depends(get_db),
+    admin_key: str = Depends(verify_admin_key),
 ):
     """
-    Create a new constituency (admin only - to be protected with auth)
+    Create a new constituency (admin only - requires admin API key)
+
+    Requires: X-Admin-Key header with valid admin API key
+
+    **Security**: This endpoint is protected and requires admin authentication.
+    Include the admin API key in request headers as 'X-Admin-Key'.
     """
     # Check if constituency with same code already exists
     existing = db.query(Constituency).filter(Constituency.code == constituency.code).first()
