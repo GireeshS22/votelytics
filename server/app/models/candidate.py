@@ -1,5 +1,6 @@
 """Candidate model - information about political candidates"""
-from sqlalchemy import Column, Integer, String, ForeignKey, JSON, Text
+from sqlalchemy import Column, Integer, String, ForeignKey, JSON, Text, DateTime
+from sqlalchemy.sql import func
 from app.database import Base
 
 
@@ -40,6 +41,10 @@ class Candidate(Base):
 
     # Photo URL
     photo_url = Column(String(500))
+
+    # Audit fields
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     def __repr__(self):
         return f"<Candidate {self.name} - {self.party}>"

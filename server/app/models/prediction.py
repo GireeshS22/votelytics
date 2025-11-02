@@ -1,6 +1,6 @@
 """Prediction model - electoral forecasts and predictions"""
 from sqlalchemy import Column, Integer, String, ForeignKey, Float, DateTime, JSON, Text
-from datetime import datetime
+from sqlalchemy.sql import func
 from app.database import Base
 
 
@@ -42,9 +42,11 @@ class Prediction(Base):
     prediction_model = Column(String(100))  # "ML Model", "Expert Opinion", "Polling Data"
 
     # Metadata
-    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    created_at = Column(DateTime, default=datetime.utcnow)
     extra_data = Column(JSON)
+
+    # Audit fields
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     def __repr__(self):
         return f"<Prediction {self.predicted_year} - {self.predicted_winner_party}>"

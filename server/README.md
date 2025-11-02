@@ -38,11 +38,18 @@ server/
 │       └── __init__.py
 │
 ├── scripts/                 # Utility scripts
-│   ├── init_db.py          # Create all database tables
-│   └── seed_sample_data.py # Seed database with sample data
+│   ├── init_db.py              # Create all database tables
+│   ├── load_2021_data.py       # Load complete 2021 election data (4,232 candidates)
+│   ├── load_2016_data.py       # Load complete 2016 election data (4,010 candidates)
+│   ├── load_geojson.py         # Load GeoJSON boundaries for all constituencies
+│   ├── verify_2016_data.py     # Verify 2016 data quality
+│   ├── force_drop_tables.py    # Drop tables with raw SQL
+│   └── test_db.py              # Test connection
 │
-├── data/                    # Raw data files
-│   └── (place CSV/JSON election data here)
+├── data/                        # Election data files
+│   ├── 10- Detailed Results_2021.xlsx   # 2021 election data (4,232 candidates)
+│   ├── 2016 Detailed Results.xlsx       # 2016 election data (4,010 candidates)
+│   └── tn_ac_2021.geojson               # GeoJSON boundaries (1MB, 234 constituencies)
 │
 ├── tests/                   # Unit tests (future)
 │   └── __init__.py
@@ -84,11 +91,14 @@ Copy the example environment file:
 cp .env.example .env
 ```
 
-Edit `.env` with your Supabase credentials:
+Edit `.env` with your Supabase Session Pooler credentials:
 
 ```env
-DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@db.mksoocqeoylprohcbwtr.supabase.co:5432/postgres
+# Use Session Pooler for IPv4/IPv6 compatibility
+DATABASE_URL=postgresql://postgres.mksoocqeoylprohcbwtr:YOUR_PASSWORD@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres
 ```
+
+**Note**: Password with @ symbol should be URL-encoded as %40
 
 ### 3. Initialize Database
 
@@ -96,15 +106,22 @@ DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@db.mksoocqeoylprohcbwtr.supabas
 poetry run python scripts/init_db.py
 ```
 
-This creates all 5 tables in Supabase.
+This creates all 5 tables in Supabase with audit fields (created_at, updated_at).
 
-### 4. Seed Sample Data
+### 4. Load Complete Election Data
 
 ```bash
-poetry run python scripts/seed_sample_data.py
+# Load 2021 election data (4,232 candidates)
+poetry run python scripts/load_2021_data.py
+
+# Load 2016 election data (4,010 candidates) - uses batched inserts
+poetry run python scripts/load_2016_data.py
+
+# Load GeoJSON boundaries for all 234 constituencies
+poetry run python scripts/load_geojson.py
 ```
 
-This adds 3 sample constituencies and 2021 election results.
+Total data loaded: 234 constituencies, 8,242 election results across 2 elections.
 
 ### 5. Run Development Server
 
@@ -119,19 +136,23 @@ Server will run on: http://localhost:8000
 ## 🗄️ Database Models
 
 ### 1. Constituency
-Stores Tamil Nadu constituency information.
+Stores Tamil Nadu constituency information with GeoJSON boundaries.
 
 **Fields:**
 - `id` - Primary key
-- `name` - Constituency name (e.g., "Chennai Central")
+- `ac_number` - Assembly Constituency number (1-234)
+- `name` - Constituency name (e.g., "Gummidipoondi")
 - `code` - Unique code (e.g., "TN001")
-- `district` - District name (e.g., "Chennai")
+- `district` - District name (e.g., "Thiruvallur")
 - `region` - Region (North/South/Central/West)
 - `population` - Population count
 - `urban_population_pct` - Urban percentage
 - `literacy_rate` - Literacy percentage
+- `geojson` - JSON field for GeoJSON boundaries (MultiPolygon)
 - `extra_data` - JSON field for additional data
-- `geojson` - JSON field for map boundaries
+- `created_at`, `updated_at` - Audit timestamps
+
+**Data**: All 234 constituencies with GeoJSON boundaries loaded
 
 ### 2. Election
 Stores election information.
@@ -146,24 +167,32 @@ Stores election information.
 - `total_seats` - Total seats contested
 - `total_voters` - Total registered voters
 - `voter_turnout_pct` - Turnout percentage
+- `created_at`, `updated_at` - Audit timestamps
 
-### 3. ElectionResult
-Stores results for each constituency in an election.
+**Data**: 2 elections loaded (2021 and 2016)
+
+### 3. ElectionResult (Denormalized for Performance)
+Stores results for each constituency in an election with denormalized fields.
 
 **Fields:**
 - `id` - Primary key
 - `election_id` - Foreign key to elections
 - `constituency_id` - Foreign key to constituencies
 - `candidate_id` - Foreign key to candidates (nullable)
-- `candidate_name` - Name of candidate
-- `party` - Political party (DMK/AIADMK/BJP/etc.)
-- `votes_received` - Vote count
+- **Denormalized fields**: `year`, `ac_number`, `ac_name`, `total_electors`
+- `candidate_name`, `sex`, `age`, `category` - Candidate demographics
+- `party`, `symbol`, `alliance` - Party information
+- `general_votes`, `postal_votes`, `total_votes` - Vote breakdown
 - `vote_share_pct` - Vote share percentage
+- `rank` - Candidate ranking (1st, 2nd, 3rd, etc.)
 - `is_winner` - 1 if winner, 0 otherwise
-- `margin` - Victory margin in votes
-- `margin_pct` - Victory margin percentage
-- `alliance` - Alliance name (DMK Alliance/AIADMK Alliance)
+- `margin`, `margin_pct` - Victory margins (for winners & runners-up)
 - `extra_data` - JSON field
+- `created_at`, `updated_at` - Audit timestamps
+
+**Data**: 8,242 election results loaded
+- 2021: 4,232 candidates (DMK won 133 seats)
+- 2016: 4,010 candidates (ADMK won 134 seats)
 
 ### 4. Candidate
 Stores candidate information.
@@ -235,8 +264,8 @@ Stores electoral predictions.
 ### Environment Variables (`.env`)
 
 ```env
-# Database
-DATABASE_URL=postgresql://postgres:PASSWORD@db.PROJECT.supabase.co:5432/postgres
+# Database (Session Pooler for IPv4/IPv6 compatibility)
+DATABASE_URL=postgresql://postgres.PROJECT:PASSWORD@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres
 
 # API
 API_V1_PREFIX=/api
@@ -249,6 +278,8 @@ SECRET_KEY=your-secret-key-change-in-production
 SUPABASE_URL=https://PROJECT.supabase.co
 SUPABASE_ANON_KEY=your-anon-key
 ```
+
+**Important**: Use Session Pooler instead of direct connection for better IPv6 support and connection management.
 
 ### CORS Configuration
 
@@ -415,4 +446,14 @@ poetry run python script.py
 
 ---
 
-**Last Updated**: October 2024
+## 📊 Current Data Status
+
+**Constituencies**: 234/234 (100% complete with GeoJSON)
+**Elections**: 2 (2021 & 2016)
+**Election Results**: 8,242 total records
+**Scripts**: Batched loading for large datasets
+**Connection**: Session Pooler for IPv6 support
+
+---
+
+**Last Updated**: October 31, 2024

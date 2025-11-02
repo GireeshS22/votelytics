@@ -11,11 +11,12 @@
 
 Votelytics is a full-stack web application designed for the Tamil Nadu Assembly Elections 2026. It provides:
 
-- **Interactive Map**: Click on Tamil Nadu constituencies to explore detailed data
-- **Historical Analysis**: View past election results and trends (2021, 2016, 2011, etc.)
-- **Predictions**: Data-driven electoral forecasts with confidence levels
-- **Real-time Updates**: Live tracking as elections approach
-- **Beautiful Visualizations**: Charts and graphs powered by Recharts
+- **Interactive Map**: GeoJSON-based map with all 234 Tamil Nadu constituencies
+- **Historical Analysis**: Complete 2021 & 2016 election results (8,242 total candidates)
+- **Constituency Details**: Detailed view of all candidates with vote counts and margins
+- **Party Color Coding**: Visual representation of party performance (15+ parties)
+- **Predictions**: Data-driven electoral forecasts with confidence levels (coming soon)
+- **Beautiful Visualizations**: Party-wise seat distribution and trends
 
 ---
 
@@ -116,23 +117,26 @@ Navigate to: http://localhost:5173
 
 ## 🗄️ Database Setup
 
-The project uses **Supabase** (cloud PostgreSQL):
+The project uses **Supabase** (cloud PostgreSQL) with Session Pooler:
 
 **Connection Details:**
-- Host: `db.mksoocqeoylprohcbwtr.supabase.co`
+- Host: `aws-1-ap-southeast-1.pooler.supabase.com` (Session Pooler)
 - Database: `postgres`
 - Connection configured in: `server/.env`
 
 **Database Schema:**
-1. **constituencies** - TN constituencies with demographics
-2. **elections** - Historical elections (2021, 2016, etc.)
-3. **election_results** - Detailed results per constituency
+1. **constituencies** - 234 TN constituencies with GeoJSON boundaries
+2. **elections** - 2 historical elections (2021 & 2016)
+3. **election_results** - 8,242 detailed results (denormalized for performance)
 4. **candidates** - Candidate profiles and backgrounds
 5. **predictions** - Electoral forecasts with confidence levels
 
-**Sample Data:**
-- 3 constituencies (Chennai Central, Madurai Central, Coimbatore North)
-- 2021 election results with vote shares
+**Complete Data Loaded:**
+- **234 constituencies** with GeoJSON boundaries (100% coverage)
+- **2021 Election**: 4,232 candidates across all 234 constituencies
+- **2016 Election**: 4,010 candidates across all 234 constituencies
+- Party results: DMK 133 (2021), ADMK 134 (2016)
+- All vote counts, margins, and ranks included
 
 ---
 
@@ -157,22 +161,28 @@ The project uses **Supabase** (cloud PostgreSQL):
 
 ## 🎨 Key Features Implemented
 
-### ✅ Completed
-1. **Full Backend API** with FastAPI and Supabase
-2. **Database Models** with SQLAlchemy ORM
-3. **React Frontend** with TypeScript
-4. **Interactive Leaflet Map** for Tamil Nadu
-5. **API Integration** with Axios
-6. **Responsive UI** with Tailwind CSS
-7. **CORS Configuration** for cross-origin requests
+### ✅ Completed (MVP Ready!)
+1. **Full Backend API** with FastAPI and Supabase (10+ endpoints)
+2. **Complete Database** with 8,242 election results (2021 & 2016)
+3. **Real GeoJSON Boundaries** for all 234 Tamil Nadu constituencies
+4. **Interactive Leaflet Map** with party color-coding
+5. **Constituency Detail Page** showing 2021 & 2016 results side-by-side
+6. **Candidate Cards** with vote counts, margins, and rankings
+7. **Party Color System** for 15+ political parties
+8. **Responsive UI** with Tailwind CSS (mobile, tablet, desktop)
+9. **Click Navigation** from map to constituency details
+10. **Session Pooler** connection for IPv6 compatibility
+11. **Batched Data Loading** scripts for large datasets
 
 ### 🚧 Pending (Future Enhancements)
-1. **Constituency Detail Page** with historical charts
-2. **Actual GeoJSON Data** for Tamil Nadu constituency boundaries
-3. **Prediction Algorithms** with ML models
-4. **User Polls** and engagement features
-5. **Admin Panel** for data management
-6. **Authentication** using Supabase Auth
+1. **State Dashboard** with overall seat tally and party-wise charts
+2. **Comparison Features** - Side-by-side 2021 vs 2016 analysis
+3. **More Historical Data** - Load 2011 and 2006 elections
+4. **Prediction Algorithms** with ML models for 2026 forecasts
+5. **Charts & Visualizations** - Vote share trends, swing analysis
+6. **User Polls** and engagement features
+7. **Admin Panel** for data management
+8. **Authentication** using Supabase Auth
 
 ---
 
@@ -258,4 +268,14 @@ For issues or questions, check:
 
 **Built with ❤️ for transparent democracy in Tamil Nadu**
 
-Last Updated: October 2024
+---
+
+## 📈 Project Status
+
+**Current Version**: MVP Complete (October 31, 2024)
+**Data Coverage**: 100% (All 234 constituencies, 2021 & 2016 elections)
+**Total Records**: 8,242 election results
+**Features**: Interactive map, constituency details, party analysis
+**Next Milestone**: State dashboard and comparison features
+
+Last Updated: October 31, 2024

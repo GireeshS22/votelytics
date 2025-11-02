@@ -29,6 +29,9 @@ poetry.lock
 *~
 .DS_Store
 
+# Claude Code
+.claude/
+
 # Node
 node_modules/
 npm-debug.log*
@@ -53,6 +56,9 @@ dist-ssr
 *.sqlite
 *.sqlite3
 
+# Data files
+server/data/
+
 # Logs
 logs/
 *.log
@@ -69,3 +75,7 @@ alembic/versions/*.pyc
 # OS
 Thumbs.db
 .DS_Store
+
+# Temporary/generated files
+dot_grid_a4.pdf
+generate_dot_grid.py
