@@ -39,14 +39,24 @@ function ElectionResults({ year, results, title }: ElectionResultsProps) {
   // Year-specific gradient colors
   const gradientClasses = year === 2021
     ? 'from-blue-500 to-indigo-600'
-    : 'from-green-500 to-teal-600';
+    : year === 2016
+    ? 'from-green-500 to-teal-600'
+    : 'from-purple-500 to-pink-600';
 
   const bgGradient = year === 2021
     ? 'from-blue-50 to-indigo-50'
-    : 'from-green-50 to-teal-50';
+    : year === 2016
+    ? 'from-green-50 to-teal-50'
+    : 'from-purple-50 to-pink-50';
+
+  const borderColor = year === 2021
+    ? 'border-blue-600'
+    : year === 2016
+    ? 'border-green-600'
+    : 'border-purple-600';
 
   return (
-    <div className={`bg-gradient-to-br ${bgGradient} rounded-2xl shadow-xl p-6 border-t-4 ${year === 2021 ? 'border-blue-600' : 'border-green-600'}`}>
+    <div className={`bg-gradient-to-br ${bgGradient} rounded-2xl shadow-xl p-6 border-t-4 ${borderColor}`}>
       {/* Section Header with Year Badge */}
       <div className="mb-6">
         <div className={`inline-flex items-center gap-2 bg-gradient-to-r ${gradientClasses} text-white px-4 py-2 rounded-full mb-4 shadow-lg`}>
