@@ -18,6 +18,7 @@ class Constituency(Base):
     ac_number = Column(Integer, nullable=False, unique=True, index=True)  # 1-234
     name = Column(String(200), nullable=False, index=True)
     code = Column(String(10), nullable=False, unique=True, index=True)
+    slug = Column(String(200), nullable=True, unique=True, index=True)  # SEO-friendly URL slug
 
     # Location
     district = Column(String(100), nullable=True, index=True)

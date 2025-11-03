@@ -5,6 +5,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { electionsAPI } from '../services/api';
 import { getPartyColor, formatPartyName } from '../utils/partyColors';
+import MetaTags from '../components/SEO/MetaTags';
+import { PAGE_SEO, SEO_CONFIG } from '../utils/seoConfig';
+import { generateDatasetSchema } from '../utils/structuredData';
 
 interface SwingData {
   from_year: number;
@@ -79,8 +82,24 @@ function SwingAnalysis() {
     );
   }
 
+  // Generate structured data for swing analysis page
+  const datasetSchema = generateDatasetSchema(
+    'Tamil Nadu Election Swing Analysis 2016-2021',
+    'Analysis of constituency flips and electoral swings between 2016 and 2021 Tamil Nadu assembly elections'
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <>
+      {/* SEO Meta Tags */}
+      <MetaTags
+        title={PAGE_SEO.swingAnalysis.title}
+        description={PAGE_SEO.swingAnalysis.description}
+        keywords={PAGE_SEO.swingAnalysis.keywords}
+        canonical={`${SEO_CONFIG.siteUrl}/analysis/swing`}
+        structuredData={datasetSchema}
+      />
+
+      <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4 max-w-7xl">
         {/* Header */}
         <div className="mb-8">
@@ -207,7 +226,7 @@ function SwingAnalysis() {
                 <div
                   key={flip.constituency_id}
                   className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => navigate(`/constituency/${flip.constituency_id}`)}
+                  onClick={() => navigate(`/constituency/${flip.ac_slug}`)}
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div>
@@ -271,7 +290,7 @@ function SwingAnalysis() {
                 <div
                   key={change.constituency_id}
                   className="py-3 border-b last:border-b-0 hover:bg-gray-50 cursor-pointer rounded px-2"
-                  onClick={() => navigate(`/constituency/${change.constituency_id}`)}
+                  onClick={() => navigate(`/constituency/${change.ac_slug}`)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -315,7 +334,7 @@ function SwingAnalysis() {
                 <div
                   key={change.constituency_id}
                   className="py-3 border-b last:border-b-0 hover:bg-gray-50 cursor-pointer rounded px-2"
-                  onClick={() => navigate(`/constituency/${change.constituency_id}`)}
+                  onClick={() => navigate(`/constituency/${change.ac_slug}`)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -346,6 +365,7 @@ function SwingAnalysis() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 

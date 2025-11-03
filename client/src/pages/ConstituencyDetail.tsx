@@ -6,12 +6,14 @@ import { useParams } from 'react-router-dom';
 import { constituenciesAPI, electionsAPI } from '../services/api';
 import ConstituencyHeader from '../components/constituency/ConstituencyHeader';
 import ElectionResults from '../components/constituency/ElectionResults';
+import MetaTags from '../components/SEO/MetaTags';
+import { getConstituencySEO, SEO_CONFIG } from '../utils/seoConfig';
+import { generateConstituencySchema, generateBreadcrumbSchema } from '../utils/structuredData';
 import type { Constituency } from '../types/constituency';
 import type { ElectionResult } from '../types/election';
 
 function ConstituencyDetail() {
-  const { id } = useParams<{ id: string }>();
-  const constituencyId = parseInt(id || '0', 10);
+  const { slug } = useParams<{ slug: string }>();
 
   const [constituency, setConstituency] = useState<Constituency | null>(null);
   const [results2021, setResults2021] = useState<ElectionResult[]>([]);
@@ -21,21 +23,21 @@ function ConstituencyDetail() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (constituencyId) {
+    if (slug) {
       loadData();
     }
-  }, [constituencyId]);
+  }, [slug]);
 
   const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Fetch constituency details and all election results in parallel
-      const [constituencyData, allResults] = await Promise.all([
-        constituenciesAPI.getById(constituencyId),
-        electionsAPI.getConstituencyHistory(constituencyId)
-      ]);
+      // Fetch constituency by slug
+      const constituencyData = await constituenciesAPI.getBySlug(slug!);
+
+      // Fetch election results using the constituency ID
+      const allResults = await electionsAPI.getConstituencyHistory(constituencyData.id);
 
       setConstituency(constituencyData);
 
@@ -97,8 +99,38 @@ function ConstituencyDetail() {
     );
   }
 
+  // Generate SEO data dynamically based on constituency
+  const seoData = getConstituencySEO(
+    constituency.name,
+    constituency.district,
+    constituency.ac_number
+  );
+
+  // Generate structured data for constituency
+  const constituencySchema = generateConstituencySchema(constituency);
+  const breadcrumbSchema = generateBreadcrumbSchema([
+    { name: 'Home', url: SEO_CONFIG.siteUrl },
+    { name: 'Constituencies', url: `${SEO_CONFIG.siteUrl}/` },
+    { name: constituency.name, url: `${SEO_CONFIG.siteUrl}/constituency/${constituency.slug}` },
+  ]);
+
+  const combinedStructuredData = {
+    '@context': 'https://schema.org',
+    '@graph': [constituencySchema, breadcrumbSchema],
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50">
+    <>
+      {/* SEO Meta Tags */}
+      <MetaTags
+        title={seoData.title}
+        description={seoData.description}
+        keywords={seoData.keywords}
+        canonical={`${SEO_CONFIG.siteUrl}/constituency/${constituency.slug}`}
+        structuredData={combinedStructuredData}
+      />
+
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50">
       <div className="container mx-auto px-4 py-8 max-w-[1800px]">
         {/* Constituency Header */}
         <ConstituencyHeader constituency={constituency} />
@@ -161,6 +193,7 @@ function ConstituencyDetail() {
         )}
       </div>
     </div>
+    </>
   );
 }
 

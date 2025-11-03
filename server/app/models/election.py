@@ -60,6 +60,7 @@ class ElectionResult(Base):
     # Denormalized constituency data (snapshot for this election)
     ac_number = Column(Integer, nullable=False, index=True)
     ac_name = Column(String(200), nullable=False, index=True)
+    ac_slug = Column(String(200), index=True)  # Constituency slug for SEO-friendly URLs
     total_electors = Column(Integer)  # Per constituency per year
 
     # Candidate details

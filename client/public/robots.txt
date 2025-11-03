@@ -1,0 +1,14 @@
+# Robots.txt for Votelytics
+# Tamil Nadu Election Data & Analysis Platform
+
+User-agent: *
+Allow: /
+
+# Disallow admin or backend routes if any
+Disallow: /api/
+
+# Sitemap location
+Sitemap: https://votelytics.com/sitemap.xml
+
+# Crawl-delay (optional, can help with server load)
+Crawl-delay: 1

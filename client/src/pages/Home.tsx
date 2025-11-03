@@ -2,10 +2,13 @@
  * Home page - displays the interactive Tamil Nadu map
  * Optimized with caching and memoization
  */
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { constituenciesAPI, electionsAPI } from '../services/api';
 import TNMap from '../components/map/TNMap';
+import MetaTags from '../components/SEO/MetaTags';
+import { PAGE_SEO, SEO_CONFIG } from '../utils/seoConfig';
+import { generateWebsiteSchema, generateOrganizationSchema } from '../utils/structuredData';
 import type { Constituency } from '../types/constituency';
 import type { Election, ElectionResult } from '../types/election';
 
@@ -86,7 +89,7 @@ function Home() {
   // Memoize click handler to prevent re-creation on every render
   const handleConstituencyClick = useCallback((constituency: Constituency) => {
     console.log('Constituency clicked:', constituency);
-    navigate(`/constituency/${constituency.id}`);
+    navigate(`/constituency/${constituency.slug}`);
   }, [navigate]);
 
   if (loading) {
@@ -120,8 +123,27 @@ function Home() {
   // Get currently selected election
   const selectedElection = elections.find(e => e.id === selectedElectionId);
 
+  // Generate combined structured data for homepage
+  const combinedStructuredData = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      generateWebsiteSchema(),
+      generateOrganizationSchema(),
+    ],
+  };
+
   return (
-    <div className="h-screen flex flex-col relative">
+    <>
+      {/* SEO Meta Tags */}
+      <MetaTags
+        title={PAGE_SEO.home.title}
+        description={PAGE_SEO.home.description}
+        keywords={PAGE_SEO.home.keywords}
+        canonical={`${SEO_CONFIG.siteUrl}/`}
+        structuredData={combinedStructuredData}
+      />
+
+      <div className="h-screen flex flex-col relative">
       {/* Year Selection Dropdown - positioned to avoid header overlap */}
       <div className="absolute top-2 right-4 z-[1001]">
         <div className="bg-white rounded-lg shadow-lg p-3">
@@ -178,6 +200,7 @@ function Home() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 

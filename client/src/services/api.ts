@@ -84,6 +84,30 @@ export const constituenciesAPI = {
   },
 
   /**
+   * Get constituency by SEO-friendly slug
+   * Cached for 24 hours
+   */
+  getBySlug: async (slug: string): Promise<Constituency> => {
+    const cacheKey = `${CACHE_KEYS.CONSTITUENCY_PREFIX}slug:${slug}`;
+
+    // Check cache first
+    const cached = getCached<Constituency>(cacheKey);
+    if (cached) {
+      console.log(`✅ Constituency ${slug} loaded from cache`);
+      return cached;
+    }
+
+    // Fetch from API
+    console.log(`🌐 Fetching constituency ${slug} from API...`);
+    const response = await apiClient.get<Constituency>(`/constituencies/slug/${slug}`);
+
+    // Cache result
+    setCached(cacheKey, response.data, CACHE_TTL.ONE_DAY);
+
+    return response.data;
+  },
+
+  /**
    * Get all constituencies in a district
    */
   getByDistrict: async (district: string): Promise<Constituency[]> => {

@@ -2,11 +2,11 @@
  * Tamil Nadu Map Component using Leaflet with GeoJSON polygons
  * Optimized with memoization for better performance
  */
-import { useEffect, useRef, useState, useMemo, memo } from 'react';
+import { useEffect, useRef, useMemo, memo } from 'react';
 import L from 'leaflet';
 import { useNavigate } from 'react-router-dom';
 import type { ConstituencyWithWinner } from '../../pages/Home';
-import { getPartyColor, formatPartyName, PARTY_COLORS } from '../../utils/partyColors';
+import { getPartyColor, formatPartyName } from '../../utils/partyColors';
 
 interface TNMapProps {
   constituencies: ConstituencyWithWinner[];

@@ -5,6 +5,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { partyAPI } from '../services/api';
 import { getPartyColor, formatPartyName } from '../utils/partyColors';
+import MetaTags from '../components/SEO/MetaTags';
+import { getPartySEO, SEO_CONFIG, PARTY_FULL_NAMES } from '../utils/seoConfig';
+import { generatePartySchema, generateBreadcrumbSchema } from '../utils/structuredData';
 import type { ElectionResult } from '../types/election';
 
 function PartyProfile() {
@@ -133,8 +136,35 @@ function PartyProfile() {
     );
   }
 
+  // Generate SEO data dynamically based on party
+  const fullPartyName = PARTY_FULL_NAMES[partyName || ''];
+  const seoData = getPartySEO(partyName || '', fullPartyName);
+
+  // Generate structured data for party
+  const partySchema = generatePartySchema(partyName || '', fullPartyName || partyDisplayName);
+  const breadcrumbSchema = generateBreadcrumbSchema([
+    { name: 'Home', url: SEO_CONFIG.siteUrl },
+    { name: 'Parties', url: `${SEO_CONFIG.siteUrl}/` },
+    { name: partyDisplayName, url: `${SEO_CONFIG.siteUrl}/party/${partyName}` },
+  ]);
+
+  const combinedStructuredData = {
+    '@context': 'https://schema.org',
+    '@graph': [partySchema, breadcrumbSchema],
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50">
+    <>
+      {/* SEO Meta Tags */}
+      <MetaTags
+        title={seoData.title}
+        description={seoData.description}
+        keywords={seoData.keywords}
+        canonical={`${SEO_CONFIG.siteUrl}/party/${partyName}`}
+        structuredData={combinedStructuredData}
+      />
+
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
 
         {/* Party Header */}
@@ -238,7 +268,7 @@ function PartyProfile() {
               <div
                 key={result.id}
                 className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                onClick={() => navigate(`/constituency/${result.constituency_id}`)}
+                onClick={() => navigate(`/constituency/${result.ac_slug}`)}
               >
                 <div className="text-3xl font-bold text-gray-400">#{index + 1}</div>
                 <div className="flex-1">
@@ -272,7 +302,7 @@ function PartyProfile() {
                 key={result.id}
                 className="p-4 border-2 rounded-lg hover:shadow-lg transition-all cursor-pointer"
                 style={{ borderColor: partyColor }}
-                onClick={() => navigate(`/constituency/${result.constituency_id}`)}
+                onClick={() => navigate(`/constituency/${result.ac_slug}`)}
               >
                 <div className="flex items-start justify-between mb-2">
                   <div className="font-bold text-lg">{result.ac_name}</div>
@@ -315,7 +345,7 @@ function PartyProfile() {
                 <div
                   key={result.id}
                   className="p-4 border-2 border-yellow-400 rounded-lg hover:shadow-lg transition-all cursor-pointer"
-                  onClick={() => navigate(`/constituency/${result.constituency_id}`)}
+                  onClick={() => navigate(`/constituency/${result.ac_slug}`)}
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="font-bold text-lg">{result.ac_name}</div>
@@ -349,6 +379,7 @@ function PartyProfile() {
         )}
       </div>
     </div>
+    </>
   );
 }
 

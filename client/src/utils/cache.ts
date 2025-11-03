@@ -5,7 +5,7 @@
 
 // Cache version - increment this when database schema/data changes
 // This will invalidate all old cache automatically
-const CACHE_VERSION = 2; // Incremented after ADMK->AIADMK fix
+const CACHE_VERSION = 3; // Incremented after adding slug field to constituencies
 
 interface CacheItem<T> {
   data: T;

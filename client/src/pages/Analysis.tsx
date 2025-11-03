@@ -5,6 +5,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { electionsAPI } from '../services/api';
 import { getPartyColor, formatPartyName } from '../utils/partyColors';
+import MetaTags from '../components/SEO/MetaTags';
+import { PAGE_SEO, SEO_CONFIG } from '../utils/seoConfig';
+import { generateDatasetSchema } from '../utils/structuredData';
 
 interface BastionData {
   years: number[];
@@ -13,6 +16,7 @@ interface BastionData {
     constituency_id: number;
     constituency_name: string;
     ac_number: number;
+    ac_slug: string;
     party: string;
     margin_2011: number;
     margin_2016: number;
@@ -113,8 +117,24 @@ function Analysis() {
     return colors[strength as keyof typeof colors] || colors.moderate;
   };
 
+  // Generate structured data for analysis page
+  const datasetSchema = generateDatasetSchema(
+    'Tamil Nadu Bastion Seats Analysis 2011-2021',
+    'Analysis of constituencies held by the same party across three consecutive elections in Tamil Nadu'
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <>
+      {/* SEO Meta Tags */}
+      <MetaTags
+        title={PAGE_SEO.analysis.title}
+        description={PAGE_SEO.analysis.description}
+        keywords={PAGE_SEO.analysis.keywords}
+        canonical={`${SEO_CONFIG.siteUrl}/analysis`}
+        structuredData={datasetSchema}
+      />
+
+      <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4 max-w-7xl">
         {/* Header with Navigation */}
         <div className="mb-8">
@@ -292,7 +312,7 @@ function Analysis() {
                 <div
                   key={seat.constituency_id}
                   className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => navigate(`/constituency/${seat.constituency_id}`)}
+                  onClick={() => navigate(`/constituency/${seat.ac_slug}`)}
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
@@ -360,6 +380,7 @@ function Analysis() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 

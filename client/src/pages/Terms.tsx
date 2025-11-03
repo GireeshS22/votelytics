@@ -1,10 +1,22 @@
 /**
  * Terms and Conditions page
  */
+import MetaTags from '../components/SEO/MetaTags';
+import { PAGE_SEO, SEO_CONFIG } from '../utils/seoConfig';
 
 function Terms() {
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
+    <>
+      {/* SEO Meta Tags */}
+      <MetaTags
+        title={PAGE_SEO.terms.title}
+        description={PAGE_SEO.terms.description}
+        keywords={PAGE_SEO.terms.keywords}
+        canonical={`${SEO_CONFIG.siteUrl}/terms`}
+        noindex={true}
+      />
+
+      <div className="min-h-screen bg-gray-50 py-12">
       <div className="container mx-auto px-4 max-w-4xl">
         <div className="bg-white rounded-lg shadow-lg p-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Terms and Conditions</h1>
@@ -300,6 +312,7 @@ function Terms() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 
