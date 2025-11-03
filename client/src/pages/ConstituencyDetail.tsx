@@ -16,6 +16,7 @@ function ConstituencyDetail() {
   const [constituency, setConstituency] = useState<Constituency | null>(null);
   const [results2021, setResults2021] = useState<ElectionResult[]>([]);
   const [results2016, setResults2016] = useState<ElectionResult[]>([]);
+  const [results2011, setResults2011] = useState<ElectionResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,8 +48,13 @@ function ConstituencyDetail() {
         .filter(r => r.year === 2016)
         .sort((a, b) => (a.rank || 999) - (b.rank || 999));
 
+      const results2011Data = allResults
+        .filter(r => r.year === 2011)
+        .sort((a, b) => (a.rank || 999) - (b.rank || 999));
+
       setResults2021(results2021Data);
       setResults2016(results2016Data);
+      setResults2011(results2011Data);
 
     } catch (err) {
       console.error('Error loading constituency data:', err);
@@ -98,7 +104,7 @@ function ConstituencyDetail() {
         <ConstituencyHeader constituency={constituency} />
 
         {/* No Data Warning */}
-        {results2021.length === 0 && results2016.length === 0 ? (
+        {results2021.length === 0 && results2016.length === 0 && results2011.length === 0 ? (
           <div className="bg-yellow-50 border-2 border-yellow-200 rounded-2xl p-8 text-center shadow-lg">
             <div className="text-6xl mb-4">⚠️</div>
             <div className="text-2xl font-bold text-yellow-800 mb-3">
@@ -116,14 +122,14 @@ function ConstituencyDetail() {
                 Election Results Comparison
               </h2>
               <div className="flex items-center justify-center gap-4">
-                <div className="h-1 w-20 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full"></div>
-                <span className="text-gray-600 font-medium">2021 vs 2016</span>
-                <div className="h-1 w-20 bg-gradient-to-r from-green-500 to-green-600 rounded-full"></div>
+                <div className="h-1 w-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full"></div>
+                <span className="text-gray-600 font-medium">2021 vs 2016 vs 2011</span>
+                <div className="h-1 w-16 bg-gradient-to-r from-purple-500 to-purple-600 rounded-full"></div>
               </div>
             </div>
 
             {/* Side-by-Side Election Results Grid */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 lg:gap-8">
               {/* 2021 Election Results */}
               <div className="flex flex-col">
                 <ElectionResults
@@ -138,6 +144,15 @@ function ConstituencyDetail() {
                 <ElectionResults
                   year={2016}
                   results={results2016}
+                  title="Tamil Nadu Assembly Election"
+                />
+              </div>
+
+              {/* 2011 Election Results */}
+              <div className="flex flex-col">
+                <ElectionResults
+                  year={2011}
+                  results={results2011}
                   title="Tamil Nadu Assembly Election"
                 />
               </div>
