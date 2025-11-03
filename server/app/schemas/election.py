@@ -69,6 +69,7 @@ class ElectionResultBase(BaseModel):
     # Denormalized constituency data
     ac_number: int
     ac_name: str
+    ac_slug: Optional[str] = None  # Constituency slug for SEO-friendly URLs
     total_electors: Optional[int] = None
 
     # Candidate details

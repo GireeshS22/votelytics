@@ -28,6 +28,7 @@ export interface ElectionResult {
   // Denormalized constituency data
   ac_number: number;
   ac_name: string;
+  ac_slug: string | null;
   total_electors: number | null;
 
   // Candidate details

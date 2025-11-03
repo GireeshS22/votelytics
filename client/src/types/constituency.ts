@@ -7,6 +7,7 @@ export interface Constituency {
   ac_number: number;
   name: string;
   code: string;
+  slug: string | null;
   district: string | null;
   region: string | null;
   population: number | null;

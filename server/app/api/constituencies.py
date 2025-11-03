@@ -84,6 +84,20 @@ def get_constituency_by_code(code: str, db: Session = Depends(get_db)):
     return constituency
 
 
+@router.get("/slug/{slug}", response_model=ConstituencyResponse)
+def get_constituency_by_slug(slug: str, db: Session = Depends(get_db)):
+    """
+    Get constituency information by SEO-friendly slug
+    Example: /constituencies/slug/gummidipoondi
+    """
+    constituency = db.query(Constituency).filter(Constituency.slug == slug).first()
+
+    if not constituency:
+        raise HTTPException(status_code=404, detail="Constituency not found")
+
+    return constituency
+
+
 @router.post("/", response_model=ConstituencyResponse, status_code=201)
 @limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def create_constituency(

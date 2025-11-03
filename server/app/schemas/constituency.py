@@ -9,6 +9,7 @@ class ConstituencyBase(BaseModel):
     ac_number: int
     name: str
     code: str
+    slug: Optional[str] = None
     district: Optional[str] = None
     region: Optional[str] = None
     population: Optional[int] = None
@@ -42,6 +43,7 @@ class ConstituencyUpdate(BaseModel):
     """Schema for updating constituency (all fields optional)"""
     name: Optional[str] = None
     code: Optional[str] = None
+    slug: Optional[str] = None
     district: Optional[str] = None
     region: Optional[str] = None
     population: Optional[int] = None
