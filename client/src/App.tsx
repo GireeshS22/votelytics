@@ -42,7 +42,7 @@ function App() {
               <Route path="/analysis" element={<Analysis />} />
               <Route path="/analysis/swing" element={<SwingAnalysis />} />
               <Route path="/analysis/bastion" element={<BastionAnalysis />} />
-              <Route path="/constituency" element={<ConstituencyList />} />
+              <Route path="/constituencies" element={<ConstituencyList />} />
               <Route path="/constituency/:slug" element={<ConstituencyDetail />} />
               <Route path="/party/:partyName" element={<PartyProfile />} />
               <Route path="/terms" element={<Terms />} />
