@@ -64,9 +64,9 @@ function ConstituencyList() {
 
       // Fetch winners for each election
       const [winners2021, winners2016, winners2011] = await Promise.all([
-        electionsAPI.getResults(election2021.id, { winner_only: true, limit: 500 }),
-        electionsAPI.getResults(election2016.id, { winner_only: true, limit: 500 }),
-        electionsAPI.getResults(election2011.id, { winner_only: true, limit: 500 }),
+        election2021 ? electionsAPI.getResults(election2021.id, { winner_only: true, limit: 500 }) : Promise.resolve([]),
+        election2016 ? electionsAPI.getResults(election2016.id, { winner_only: true, limit: 500 }) : Promise.resolve([]),
+        election2011 ? electionsAPI.getResults(election2011.id, { winner_only: true, limit: 500 }) : Promise.resolve([]),
       ]);
 
       // Create lookup maps
@@ -134,7 +134,7 @@ function ConstituencyList() {
 
   // Get unique districts for filter
   const districts = useMemo(() => {
-    const uniqueDistricts = new Set(data.map(d => d.district).filter(Boolean));
+    const uniqueDistricts = new Set(data.map(d => d.district).filter((d): d is string => Boolean(d)));
     return Array.from(uniqueDistricts).sort();
   }, [data]);
 
@@ -189,26 +189,6 @@ function ConstituencyList() {
     }
   };
 
-  const getTrendBadge = (trend: string, party?: string) => {
-    if (trend === 'bastion') {
-      return (
-        <span className="px-2 py-1 text-xs font-semibold rounded bg-green-100 text-green-800 border border-green-300">
-          🏰 Bastion
-        </span>
-      );
-    } else if (trend === 'flipped') {
-      return (
-        <span className="px-2 py-1 text-xs font-semibold rounded bg-orange-100 text-orange-800 border border-orange-300">
-          🔄 Flipped
-        </span>
-      );
-    }
-    return (
-      <span className="px-2 py-1 text-xs font-semibold rounded bg-gray-100 text-gray-600 border border-gray-300">
-        —
-      </span>
-    );
-  };
 
   if (loading) {
     return (
