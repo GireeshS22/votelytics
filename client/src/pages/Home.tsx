@@ -185,7 +185,7 @@ function Home() {
               <div className="text-sm text-gray-600">Constituencies</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-green-600">234</div>
+              <div className="text-2xl font-bold text-green-600">{constituencies.length}</div>
               <div className="text-sm text-gray-600">Total Seats</div>
             </div>
             <div>
