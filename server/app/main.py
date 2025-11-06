@@ -53,7 +53,7 @@ from app.api import constituencies, elections
 
 app.include_router(
     constituencies.router,
-    prefix="/api/constituencies",
+    prefix="/api/constituency",
     tags=["Constituencies"],
 )
 

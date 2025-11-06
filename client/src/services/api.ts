@@ -41,7 +41,7 @@ export const constituenciesAPI = {
 
     // Fetch from API
     console.log('🌐 Fetching constituencies from API...');
-    const response = await apiClient.get<ConstituencyList>('/constituencies/', { params });
+    const response = await apiClient.get<ConstituencyList>('/constituency/', { params });
 
     // Cache full list only
     if (!params?.district && !params?.region && !params?.skip) {
@@ -67,7 +67,7 @@ export const constituenciesAPI = {
 
     // Fetch from API
     console.log(`🌐 Fetching constituency ${id} from API...`);
-    const response = await apiClient.get<Constituency>(`/constituencies/${id}`);
+    const response = await apiClient.get<Constituency>(`/constituency/${id}`);
 
     // Cache result
     setCached(cacheKey, response.data, CACHE_TTL.ONE_DAY);
@@ -79,7 +79,7 @@ export const constituenciesAPI = {
    * Get constituency by code
    */
   getByCode: async (code: string): Promise<Constituency> => {
-    const response = await apiClient.get<Constituency>(`/constituencies/code/${code}`);
+    const response = await apiClient.get<Constituency>(`/constituency/code/${code}`);
     return response.data;
   },
 
@@ -99,7 +99,7 @@ export const constituenciesAPI = {
 
     // Fetch from API
     console.log(`🌐 Fetching constituency ${slug} from API...`);
-    const response = await apiClient.get<Constituency>(`/constituencies/slug/${slug}`);
+    const response = await apiClient.get<Constituency>(`/constituency/slug/${slug}`);
 
     // Cache result
     setCached(cacheKey, response.data, CACHE_TTL.ONE_DAY);
@@ -111,7 +111,7 @@ export const constituenciesAPI = {
    * Get all constituencies in a district
    */
   getByDistrict: async (district: string): Promise<Constituency[]> => {
-    const response = await apiClient.get<Constituency[]>(`/constituencies/district/${district}`);
+    const response = await apiClient.get<Constituency[]>(`/constituency/district/${district}`);
     return response.data;
   },
 };
