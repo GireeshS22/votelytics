@@ -1,7 +1,6 @@
 /**
  * Sitemap Generator for Votelytics
  * Generates sitemap.xml with all 254+ pages using SEO-friendly slug URLs
- * Supports both votelytics.com and votelytics.in domains
  */
 
 const fs = require('fs');
@@ -13,7 +12,7 @@ const execPromise = util.promisify(exec);
 
 // Read site URL from .env file or use default
 const envPath = path.join(__dirname, '../.env');
-let BASE_URL = 'https://votelytics.com'; // Default fallback
+let BASE_URL = 'https://votelytics.in'; // Default fallback
 
 if (fs.existsSync(envPath)) {
   const envContent = fs.readFileSync(envPath, 'utf8');

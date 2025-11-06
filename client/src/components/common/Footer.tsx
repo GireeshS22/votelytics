@@ -13,7 +13,7 @@ function Footer() {
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-start gap-2">
             <span className="text-lg font-bold flex-shrink-0">⚠️</span>
-            <p className="text-sm font-semibold">
+            <p className="text-base font-semibold">
               <strong>Voting Disclaimer:</strong> Any analysis, predictions, or trends shown for future elections (including 2026) are for informational and educational purposes only.
               They do NOT constitute recommendations, endorsements, or advice on how to vote.
               We do not endorse any political party, candidate, or ideology.
@@ -28,7 +28,7 @@ function Footer() {
           {/* About */}
           <div>
             <h3 className="text-lg font-bold mb-3">Votelytics</h3>
-            <p className="text-sm text-gray-300">
+            <p className="text-base text-gray-300">
               A free, open-source educational project for exploring Tamil Nadu election data.
               Not affiliated with any government body or political organization.
             </p>
@@ -79,7 +79,7 @@ function Footer() {
                 </Link>
               </li>
             </ul>
-            <div className="mt-4 text-xs text-gray-400">
+            <div className="mt-4 text-sm text-gray-400">
               <p className="mb-1">⚠️ Data may contain errors</p>
               <p>Not for official use</p>
             </div>
@@ -127,7 +127,7 @@ function Footer() {
           <p className="mb-2">
             © {currentYear} Votelytics. Open Source Project. No warranty provided.
           </p>
-          <p className="text-xs">
+          <p className="text-sm">
             This is an independent, unofficial project. Always verify data with official sources.
           </p>
         </div>

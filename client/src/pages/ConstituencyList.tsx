@@ -301,14 +301,118 @@ function ConstituencyList() {
             </div>
           </div>
 
-          {/* Main Table */}
-          <div className="bg-white rounded-lg shadow overflow-hidden">
+          {/* Mobile Card View */}
+          <div className="block md:hidden space-y-4">
+            {filteredAndSortedData.map((item) => (
+              <div
+                key={item.constituency_id}
+                className="bg-white rounded-lg shadow-md p-4 cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => navigate(`/constituency/${item.ac_slug || item.constituency_id}`)}
+              >
+                {/* Card Header */}
+                <div className="flex items-start justify-between mb-3 pb-3 border-b border-gray-200">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                        AC {item.ac_number}
+                      </span>
+                    </div>
+                    <h3 className="text-base font-bold text-gray-900">{item.constituency_name}</h3>
+                    {item.district && (
+                      <p className="text-sm text-gray-500 mt-1">{item.district}</p>
+                    )}
+                  </div>
+                  <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+
+                {/* Election Results */}
+                <div className="space-y-3">
+                  {/* 2021 Winner */}
+                  <div className="flex items-start gap-3">
+                    <div className="text-xs font-semibold text-gray-500 w-12 flex-shrink-0 pt-1">2021</div>
+                    {item.winner_2021 ? (
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: getPartyColor(item.winner_2021.party) }}
+                          />
+                          <span className="text-sm font-bold text-gray-900">
+                            {formatPartyName(item.winner_2021.party)}
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-700">{item.winner_2021.candidate}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          Margin: {item.winner_2021.margin.toLocaleString()}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-gray-400">No data</span>
+                    )}
+                  </div>
+
+                  {/* 2016 Winner */}
+                  <div className="flex items-start gap-3">
+                    <div className="text-xs font-semibold text-gray-500 w-12 flex-shrink-0 pt-1">2016</div>
+                    {item.winner_2016 ? (
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: getPartyColor(item.winner_2016.party) }}
+                          />
+                          <span className="text-sm font-bold text-gray-900">
+                            {formatPartyName(item.winner_2016.party)}
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-700">{item.winner_2016.candidate}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          Margin: {item.winner_2016.margin.toLocaleString()}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-gray-400">No data</span>
+                    )}
+                  </div>
+
+                  {/* 2011 Winner */}
+                  <div className="flex items-start gap-3">
+                    <div className="text-xs font-semibold text-gray-500 w-12 flex-shrink-0 pt-1">2011</div>
+                    {item.winner_2011 ? (
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: getPartyColor(item.winner_2011.party) }}
+                          />
+                          <span className="text-sm font-bold text-gray-900">
+                            {formatPartyName(item.winner_2011.party)}
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-700">{item.winner_2011.candidate}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          Margin: {item.winner_2011.margin.toLocaleString()}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-gray-400">No data</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block bg-white rounded-lg shadow overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead>
                   <tr className="bg-gray-50">
                     <th
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      className="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                       onClick={() => handleSort('ac_number')}
                     >
                       <div className="flex items-center gap-1">
@@ -316,20 +420,20 @@ function ConstituencyList() {
                       </div>
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      className="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                       onClick={() => handleSort('name')}
                     >
                       <div className="flex items-center gap-1">
                         Constituency {sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">
                       2021 Winner
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">
                       2016 Winner
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">
                       2011 Winner
                     </th>
                   </tr>
@@ -347,7 +451,7 @@ function ConstituencyList() {
                       <td className="px-4 py-3">
                         <div className="text-sm font-medium text-gray-900">{item.constituency_name}</div>
                         {item.district && (
-                          <div className="text-xs text-gray-500">{item.district}</div>
+                          <div className="text-sm text-gray-500">{item.district}</div>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -362,11 +466,11 @@ function ConstituencyList() {
                                 {formatPartyName(item.winner_2021.party)}
                               </span>
                             </div>
-                            <div className="text-xs text-gray-600">{item.winner_2021.candidate}</div>
-                            <div className="text-xs text-gray-500">Margin: {item.winner_2021.margin.toLocaleString()}</div>
+                            <div className="text-sm text-gray-600">{item.winner_2021.candidate}</div>
+                            <div className="text-sm text-gray-500">Margin: {item.winner_2021.margin.toLocaleString()}</div>
                           </div>
                         ) : (
-                          <span className="text-xs text-gray-400">No data</span>
+                          <span className="text-sm text-gray-400">No data</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -381,11 +485,11 @@ function ConstituencyList() {
                                 {formatPartyName(item.winner_2016.party)}
                               </span>
                             </div>
-                            <div className="text-xs text-gray-600">{item.winner_2016.candidate}</div>
-                            <div className="text-xs text-gray-500">Margin: {item.winner_2016.margin.toLocaleString()}</div>
+                            <div className="text-sm text-gray-600">{item.winner_2016.candidate}</div>
+                            <div className="text-sm text-gray-500">Margin: {item.winner_2016.margin.toLocaleString()}</div>
                           </div>
                         ) : (
-                          <span className="text-xs text-gray-400">No data</span>
+                          <span className="text-sm text-gray-400">No data</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -400,11 +504,11 @@ function ConstituencyList() {
                                 {formatPartyName(item.winner_2011.party)}
                               </span>
                             </div>
-                            <div className="text-xs text-gray-600">{item.winner_2011.candidate}</div>
-                            <div className="text-xs text-gray-500">Margin: {item.winner_2011.margin.toLocaleString()}</div>
+                            <div className="text-sm text-gray-600">{item.winner_2011.candidate}</div>
+                            <div className="text-sm text-gray-500">Margin: {item.winner_2011.margin.toLocaleString()}</div>
                           </div>
                         ) : (
-                          <span className="text-xs text-gray-400">No data</span>
+                          <span className="text-sm text-gray-400">No data</span>
                         )}
                       </td>
                     </tr>

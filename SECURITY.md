@@ -96,8 +96,8 @@ allow_origins = [
 Update `server/app/config.py`:
 ```python
 CORS_ORIGINS: List[str] = [
-    "https://votelytics.com",
-    "https://www.votelytics.com",
+    "https://votelytics.in",
+    "https://www.votelytics.in",
 ]
 ```
 

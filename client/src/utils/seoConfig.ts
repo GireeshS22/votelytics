@@ -3,8 +3,8 @@
  * Centralized SEO settings, keywords, and default values
  */
 
-// Get site URL from environment variable (supports both .com and .in domains)
-const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://votelytics.com';
+// Get site URL from environment variable
+const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://votelytics.in';
 
 export const SEO_CONFIG = {
   siteName: 'Votelytics',

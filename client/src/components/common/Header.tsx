@@ -200,7 +200,7 @@ function Header() {
 
           {/* Mobile menu button */}
           <button
-            className="md:hidden p-2 rounded-lg hover:bg-blue-700 transition-colors"
+            className="md:hidden p-3 rounded-lg hover:bg-blue-700 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle mobile menu"
             aria-expanded={mobileMenuOpen}
