@@ -102,21 +102,21 @@ function TNMap({ constituencies, selectedYear, onConstituencyClick }: TNMapProps
         const tooltipContent = winner ? `
           <div style="padding: 4px;">
             <div style="font-weight: bold; font-size: 14px; margin-bottom: 4px;">${constituency.name}</div>
-            <div style="font-size: 12px; color: #666; margin-bottom: 4px;">AC ${constituency.ac_number} · ${constituency.district || 'Unknown'}</div>
+            <div style="font-size: 13px; color: #666; margin-bottom: 4px;">AC ${constituency.ac_number} · ${constituency.district || 'Unknown'}</div>
             <div style="display: flex; align-items: center; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid #ddd;">
               <div style="width: 10px; height: 10px; background: ${getPartyColor(winner.party)}; border-radius: 2px;"></div>
-              <span style="font-size: 12px; font-weight: 600;">${formatPartyName(winner.party)}</span>
+              <span style="font-size: 13px; font-weight: 600;">${formatPartyName(winner.party)}</span>
             </div>
-            <div style="font-size: 11px; margin-top: 2px;">${winner.candidate_name}</div>
-            <div style="font-size: 10px; color: #888; margin-top: 2px;">
+            <div style="font-size: 14px; margin-top: 2px;">${winner.candidate_name}</div>
+            <div style="font-size: 14px; color: #888; margin-top: 2px;">
               ${winner.total_votes.toLocaleString()} votes (${winner.vote_share_pct?.toFixed(1)}%)
             </div>
           </div>
         ` : `
           <div style="padding: 4px;">
             <div style="font-weight: bold; font-size: 14px; margin-bottom: 4px;">${constituency.name}</div>
-            <div style="font-size: 12px; color: #666;">AC ${constituency.ac_number} · ${constituency.district || 'Unknown'}</div>
-            <div style="font-size: 11px; color: #999; margin-top: 6px;">Click for details</div>
+            <div style="font-size: 13px; color: #666;">AC ${constituency.ac_number} · ${constituency.district || 'Unknown'}</div>
+            <div style="font-size: 14px; color: #999; margin-top: 6px;">Click for details</div>
           </div>
         `;
 
@@ -168,12 +168,12 @@ function TNMap({ constituencies, selectedYear, onConstituencyClick }: TNMapProps
     <div className="relative w-full h-full">
       <div ref={mapContainerRef} className="w-full h-full rounded-lg shadow-lg" />
 
-      {/* Map Legend */}
-      <div className="absolute bottom-4 right-4 bg-white p-4 rounded-lg shadow-lg z-[1000] max-w-xs">
-        <h4 className="font-semibold text-sm mb-3">
+      {/* Map Legend - Responsive positioning */}
+      <div className="absolute bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-xs bg-white p-3 md:p-4 rounded-lg shadow-lg z-[1000]">
+        <h4 className="font-semibold text-sm mb-2 md:mb-3">
           {selectedYear ? `${selectedYear} Election Results` : 'Election Results'}
         </h4>
-        <div className="text-xs space-y-2">
+        <div className="text-sm space-y-1 md:space-y-2">
           {topParties.map(([party, count]) => (
             <div
               key={party}
@@ -190,21 +190,21 @@ function TNMap({ constituencies, selectedYear, onConstituencyClick }: TNMapProps
               <span className="text-gray-600 font-semibold">{count}</span>
             </div>
           ))}
-          <p className="text-gray-500 mt-3 pt-2 border-t">
-            Hover over constituencies · Click parties to view profile
+          <p className="text-gray-500 text-xs md:text-sm mt-2 md:mt-3 pt-2 border-t">
+            <span className="hidden md:inline">Hover over constituencies · </span>Click parties to view profile
           </p>
         </div>
       </div>
 
-      {/* Info Box */}
-      <div className="absolute top-4 left-4 bg-white p-4 rounded-lg shadow-lg z-[1000] max-w-xs">
+      {/* Info Box - Hidden on mobile, shown on desktop */}
+      <div className="hidden md:block absolute top-4 left-4 bg-white p-4 rounded-lg shadow-lg z-[1000] max-w-xs">
         <h3 className="font-bold text-lg mb-2">
           Tamil Nadu {selectedYear || ''}
         </h3>
         <p className="text-sm text-gray-600 mb-2">
           {constituencies.length} constituencies
         </p>
-        <p className="text-xs text-gray-500">
+        <p className="text-sm text-gray-500">
           {selectedYear && `🗳️ Showing results from ${selectedYear} Assembly Election`}
         </p>
       </div>

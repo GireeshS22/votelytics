@@ -29,10 +29,10 @@ export default function MetaTags({
   const fullTitle = title.includes('Votelytics') ? title : `${title} | Votelytics`;
 
   // Canonical URL - use provided or default to current location
-  const canonicalUrl = canonical || (typeof window !== 'undefined' ? window.location.href : 'https://votelytics.com');
+  const canonicalUrl = canonical || (typeof window !== 'undefined' ? window.location.href : 'https://votelytics.in');
 
   // Default OG image
-  const defaultOgImage = 'https://votelytics.com/og-default.png';
+  const defaultOgImage = 'https://votelytics.in/og-default.png';
   const ogImageUrl = ogImage || defaultOgImage;
 
   return (

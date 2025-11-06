@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const BASE_URL = 'https://votelytics.com';
+const BASE_URL = 'https://votelytics.in';
 const OUTPUT_PATH = path.join(__dirname, '../public/sitemap.xml');
 
 // Get current date in ISO format

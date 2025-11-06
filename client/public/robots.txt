@@ -8,7 +8,7 @@ Allow: /
 Disallow: /api/
 
 # Sitemap location
-Sitemap: https://votelytics.com/sitemap.xml
+Sitemap: https://votelytics.in/sitemap.xml
 
 # Crawl-delay (optional, can help with server load)
 Crawl-delay: 1
