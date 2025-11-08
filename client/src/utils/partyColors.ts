@@ -17,6 +17,7 @@ export const PARTY_COLORS: Record<string, string> = {
   'MDMK': '#FF1493',         // Deep Pink
   'DMDK': '#FFD700',         // Gold
   'NTK': '#800080',          // Purple
+  'TVK': '#8B4513',          // Saddle Brown (Vijay's party)
   'MNM': '#FF6347',          // Tomato
   'TMC': '#00CED1',          // Dark Turquoise
   'AMMK': '#32CD32',         // Lime Green

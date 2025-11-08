@@ -1,0 +1,17 @@
+We're launching VOTELYTICS ⚡
+
+An open-source deep analytics project powered by AI to predict the outcome of the TN 2026 elections at constituency level.
+
+Features:
+✅ Interactive constituency maps (234 ACs)
+✅ Historical analysis (2011-2021)
+✅ AI-powered swing predictions
+✅ Party bastion identification
+✅ Mobile-optimized dashboard
+
+🔮 Our first election prediction drops this weekend.
+
+Visit: https://votelytics.in
+Feedback welcome 🙏
+
+#TamilNadu #Elections2026 #AI #OpenSource #DataScience #MachineLearning #ElectionPrediction #BuildInPublic #Votelytics
