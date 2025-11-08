@@ -3,19 +3,22 @@
  */
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { constituenciesAPI, electionsAPI } from '../services/api';
+import { constituenciesAPI, electionsAPI, predictionsAPI } from '../services/api';
 import ConstituencyHeader from '../components/constituency/ConstituencyHeader';
 import ElectionResults from '../components/constituency/ElectionResults';
+import PredictionSection from '../components/constituency/PredictionSection';
 import MetaTags from '../components/SEO/MetaTags';
 import { getConstituencySEO, SEO_CONFIG } from '../utils/seoConfig';
 import { generateConstituencySchema, generateBreadcrumbSchema } from '../utils/structuredData';
 import type { Constituency } from '../types/constituency';
 import type { ElectionResult } from '../types/election';
+import type { PredictionDetail } from '../types/prediction';
 
 function ConstituencyDetail() {
   const { slug } = useParams<{ slug: string }>();
 
   const [constituency, setConstituency] = useState<Constituency | null>(null);
+  const [prediction, setPrediction] = useState<PredictionDetail | null>(null);
   const [results2021, setResults2021] = useState<ElectionResult[]>([]);
   const [results2016, setResults2016] = useState<ElectionResult[]>([]);
   const [results2011, setResults2011] = useState<ElectionResult[]>([]);
@@ -57,6 +60,15 @@ function ConstituencyDetail() {
       setResults2021(results2021Data);
       setResults2016(results2016Data);
       setResults2011(results2011Data);
+
+      // Fetch 2026 prediction (optional - don't fail if not found)
+      try {
+        const predictionData = await predictionsAPI.getByConstituency(constituencyData.id, 2026);
+        setPrediction(predictionData.prediction);
+      } catch (predErr) {
+        console.log('No prediction found for this constituency');
+        setPrediction(null);
+      }
 
     } catch (err) {
       console.error('Error loading constituency data:', err);
@@ -134,6 +146,9 @@ function ConstituencyDetail() {
       <div className="container mx-auto px-4 py-8 max-w-[1800px]">
         {/* Constituency Header */}
         <ConstituencyHeader constituency={constituency} />
+
+        {/* 2026 Prediction Section */}
+        {prediction && <PredictionSection prediction={prediction} />}
 
         {/* No Data Warning */}
         {results2021.length === 0 && results2016.length === 0 && results2011.length === 0 ? (

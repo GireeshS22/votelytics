@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = ""
     SUPABASE_ANON_KEY: str = ""
 
+    # OpenAI settings (for predictions and demographics)
+    OPENAI_API_KEY: str = ""
+
     @field_validator("ADMIN_API_KEY")
     @classmethod
     def validate_admin_key(cls, v: str, info) -> str:

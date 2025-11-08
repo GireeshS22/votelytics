@@ -27,8 +27,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Explicit methods only
-    allow_headers=["Content-Type", "X-Admin-Key", "Authorization"],  # Explicit headers only
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "X-Admin-Key", "Authorization"],
 )
 
 
@@ -49,7 +49,7 @@ async def health_check():
 
 
 # Import and include API routers
-from app.api import constituencies, elections
+from app.api import constituencies, elections, predictions
 
 app.include_router(
     constituencies.router,
@@ -63,6 +63,8 @@ app.include_router(
     tags=["Elections"],
 )
 
-# TODO: Add predictions router when ready
-# from app.api import predictions
-# app.include_router(predictions.router, prefix="/api/predictions", tags=["Predictions"])
+app.include_router(
+    predictions.router,
+    prefix="/api/predictions",
+    tags=["Predictions"],
+)

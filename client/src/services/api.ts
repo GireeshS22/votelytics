@@ -5,6 +5,15 @@
 import axios from 'axios';
 import type { Constituency, ConstituencyList } from '../types/constituency';
 import type { Election, ElectionResult } from '../types/election';
+import type {
+  Prediction,
+  PredictionDetail,
+  PredictionsSummary,
+  RegionalSummary,
+  PredictionComparison,
+  PredictionFilters,
+  PredictionsListResponse
+} from '../types/prediction';
 import { getCached, setCached, CACHE_KEYS, CACHE_TTL } from '../utils/cache';
 
 // Base API URL - should match backend server
@@ -303,6 +312,90 @@ export const partyAPI = {
       results2021,
       results2016,
     };
+  },
+};
+
+// Predictions API
+export const predictionsAPI = {
+  /**
+   * Get predictions summary for bar chart and summary cards
+   * Cached for 1 hour
+   */
+  getSummary: async (year: number = 2026): Promise<PredictionsSummary> => {
+    const cacheKey = `predictions_summary_${year}`;
+    const cached = getCached<PredictionsSummary>(cacheKey);
+    if (cached) {
+      console.log('✅ Predictions summary loaded from cache');
+      return cached;
+    }
+
+    console.log('🌐 Fetching predictions summary from API...');
+    const response = await apiClient.get<PredictionsSummary>('/predictions/summary', {
+      params: { year }
+    });
+
+    setCached(cacheKey, response.data, CACHE_TTL.ONE_HOUR);
+    return response.data;
+  },
+
+  /**
+   * Get all predictions with optional filtering
+   */
+  getAll: async (filters?: PredictionFilters): Promise<PredictionsListResponse> => {
+    console.log('🌐 Fetching predictions list from API...');
+    const response = await apiClient.get<PredictionsListResponse>('/predictions/', {
+      params: filters
+    });
+    return response.data;
+  },
+
+  /**
+   * Get detailed prediction for a specific constituency
+   */
+  getByConstituency: async (
+    constituencyId: number,
+    year: number = 2026
+  ): Promise<{ prediction: PredictionDetail }> => {
+    console.log(`🌐 Fetching prediction for constituency ${constituencyId}...`);
+    const response = await apiClient.get(`/predictions/constituency/${constituencyId}`, {
+      params: { year }
+    });
+    return response.data;
+  },
+
+  /**
+   * Get regional summary
+   * Cached for 1 hour
+   */
+  getRegionalSummary: async (year: number = 2026): Promise<RegionalSummary> => {
+    const cacheKey = `predictions_regional_${year}`;
+    const cached = getCached<RegionalSummary>(cacheKey);
+    if (cached) {
+      console.log('✅ Regional summary loaded from cache');
+      return cached;
+    }
+
+    console.log('🌐 Fetching regional summary from API...');
+    const response = await apiClient.get<RegionalSummary>('/predictions/regional-summary', {
+      params: { year }
+    });
+
+    setCached(cacheKey, response.data, CACHE_TTL.ONE_HOUR);
+    return response.data;
+  },
+
+  /**
+   * Get comparison between predictions and historical results
+   */
+  getComparison: async (
+    fromYear: number = 2021,
+    toYear: number = 2026
+  ): Promise<PredictionComparison> => {
+    console.log(`🌐 Fetching comparison ${fromYear} vs ${toYear}...`);
+    const response = await apiClient.get<PredictionComparison>('/predictions/comparison', {
+      params: { from_year: fromYear, to_year: toYear }
+    });
+    return response.data;
   },
 };
 
