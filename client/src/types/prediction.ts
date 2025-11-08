@@ -31,7 +31,6 @@ export interface PredictionDetail extends Prediction {
   };
   top_alliances: AllianceVoteShare[];
   swing_from_last_election: number;
-  key_factors: string;
 }
 
 export interface AllianceVoteShare {

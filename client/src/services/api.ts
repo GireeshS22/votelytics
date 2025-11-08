@@ -6,7 +6,6 @@ import axios from 'axios';
 import type { Constituency, ConstituencyList } from '../types/constituency';
 import type { Election, ElectionResult } from '../types/election';
 import type {
-  Prediction,
   PredictionDetail,
   PredictionsSummary,
   RegionalSummary,
