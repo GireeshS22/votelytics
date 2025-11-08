@@ -26,8 +26,12 @@ const getAllianceColor = (alliance: string): string => {
 function PredictionSection({ prediction }: PredictionSectionProps) {
   const allianceColor = getAllianceColor(prediction.predicted_winner_alliance);
 
-  // key_factors is already an array from the API
-  const keyFactors = prediction.key_factors || [];
+  // Handle key_factors - can be string (old data) or array (new data)
+  const keyFactors = Array.isArray(prediction.key_factors)
+    ? prediction.key_factors
+    : typeof prediction.key_factors === 'string' && prediction.key_factors
+    ? prediction.key_factors.split('.').map((f: string) => f.trim()).filter((f: string) => f)
+    : [];
 
   // Get top alliances for vote distribution
   const topAlliances = prediction.top_alliances || [];

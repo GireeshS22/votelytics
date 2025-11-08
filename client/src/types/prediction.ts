@@ -15,7 +15,7 @@ export interface Prediction {
   win_probability: number;
   predicted_vote_share: number;
   predicted_margin_pct: number;
-  key_factors: string[];
+  key_factors: string[] | string;
   created_at: string;
 }
 
