@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
+import re
 
 from app.database import get_db
 from app.models.constituency import Constituency
@@ -89,8 +90,14 @@ def get_constituency_by_slug(slug: str, db: Session = Depends(get_db)):
     """
     Get constituency information by SEO-friendly slug
     Example: /constituencies/slug/gummidipoondi
+    Handles malformed URLs with parentheses by normalizing them
     """
-    constituency = db.query(Constituency).filter(Constituency.slug == slug).first()
+    # Normalize slug: remove parentheses and collapse multiple hyphens
+    normalized_slug = re.sub(r'[()]', '', slug)  # Remove parentheses
+    normalized_slug = re.sub(r'-+', '-', normalized_slug)  # Collapse multiple hyphens
+    normalized_slug = normalized_slug.strip('-')  # Remove leading/trailing hyphens
+
+    constituency = db.query(Constituency).filter(Constituency.slug == normalized_slug).first()
 
     if not constituency:
         raise HTTPException(status_code=404, detail="Constituency not found")
