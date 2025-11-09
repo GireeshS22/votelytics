@@ -157,7 +157,7 @@ function ConstituencyDetail() {
   ]);
 
   // Add prediction event schema if prediction exists
-  const schemas = [constituencySchema, breadcrumbSchema];
+  const schemas: any[] = [constituencySchema, breadcrumbSchema];
   if (hasPrediction && prediction) {
     const predictionSchema = generatePredictionEventSchema(constituency, prediction);
     schemas.push(predictionSchema);
