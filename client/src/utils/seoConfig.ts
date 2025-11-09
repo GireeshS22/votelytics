@@ -9,9 +9,9 @@ const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://votelytics.in';
 export const SEO_CONFIG = {
   siteName: 'Votelytics',
   siteUrl: SITE_URL,
-  defaultTitle: 'Votelytics | Tamil Nadu Election Data & Analysis Platform',
-  defaultDescription: 'Explore comprehensive Tamil Nadu assembly election results (2011, 2016, 2021) on an interactive map. View 234 constituencies, analyze electoral trends, and compare party performance.',
-  defaultKeywords: 'Tamil Nadu election, TN assembly election, election results, constituency map, electoral analysis, India elections, Tamil Nadu MLA',
+  defaultTitle: 'Votelytics | Tamil Nadu Election Data & 2026 Predictions',
+  defaultDescription: 'Explore comprehensive Tamil Nadu assembly election results (2011, 2016, 2021) and data-driven 2026 predictions. Interactive map with 234 constituencies, electoral trends, and AI-powered forecasts.',
+  defaultKeywords: 'Tamil Nadu election, 2026 election predictions, TN assembly election, election results, constituency map, electoral analysis, 2026 forecast, India elections, Tamil Nadu MLA',
   twitterHandle: '@votelytics',
 
   // Social media images (to be added later)
@@ -22,7 +22,7 @@ export const SEO_CONFIG = {
     name: 'Votelytics',
     url: SITE_URL,
     logo: `${SITE_URL}/logo.png`,
-    description: 'Tamil Nadu Election Data Visualization and Analysis Platform',
+    description: 'Tamil Nadu Election Data Visualization, Analysis, and 2026 Predictions Platform',
   },
 };
 
@@ -31,9 +31,15 @@ export const SEO_CONFIG = {
  */
 export const PAGE_SEO = {
   home: {
-    title: 'Interactive Tamil Nadu Election Map & Results 2011-2021',
-    description: 'Explore Tamil Nadu assembly election results on an interactive map. View all 234 constituencies, analyze party performance, and track electoral trends from 2011 to 2021.',
-    keywords: 'Tamil Nadu election map, TN assembly map, interactive election map, constituency map India, election results 2021, Tamil Nadu voting data',
+    title: 'Tamil Nadu Election Map & 2026 Predictions | Votelytics',
+    description: 'Interactive Tamil Nadu election map with 2026 predictions. Explore 234 constituencies, historical results (2011-2021), and data-driven 2026 assembly election forecasts with alliance-wise seat distribution.',
+    keywords: 'Tamil Nadu election map, 2026 election predictions, TN assembly map, interactive election map, 2026 forecast Tamil Nadu, constituency predictions, election results 2021, Tamil Nadu voting data, 2026 assembly election',
+  },
+
+  predictions: {
+    title: '2026 Tamil Nadu Assembly Election Predictions | Seat Forecast',
+    description: 'Comprehensive 2026 Tamil Nadu assembly election predictions. View seat distribution, alliance-wise forecasts, constituency-level predictions, and winning probabilities for all 234 constituencies. DMK vs AIADMK seat count predictions.',
+    keywords: '2026 tamil nadu election predictions, who will win 2026 tamil nadu elections, dmk aiadmk 2026 predictions, seat predictions 2026, tamil nadu assembly election forecast, 2026 election results prediction, alliance seat distribution 2026, constituency wise predictions, tamil nadu 2026 forecast, bjp tamil nadu 2026, ntk predictions 2026',
   },
 
   analysis: {
@@ -62,16 +68,55 @@ export const PAGE_SEO = {
 };
 
 /**
- * Generate constituency-specific SEO data
+ * Generate constituency-specific SEO data with optional 2026 prediction
  */
-export function getConstituencySEO(constituencyName: string, district: string | null, acNumber: number) {
+export function getConstituencySEO(
+  constituencyName: string,
+  district: string | null,
+  acNumber: number,
+  hasPrediction: boolean = false,
+  predictedWinner?: string
+) {
   const districtText = district ? ` (${district} District)` : '';
 
-  return {
-    title: `${constituencyName} Election Results 2021 | MLA, Vote Count & Analysis`,
-    description: `Complete election results for ${constituencyName} constituency${districtText}. View 2021, 2016, and 2011 results, winning candidates, vote counts, margins, and historical electoral trends. AC ${acNumber}.`,
-    keywords: `${constituencyName} election results, ${constituencyName} MLA, ${constituencyName} assembly constituency, ${district ? district + ' constituency,' : ''} Tamil Nadu AC ${acNumber}, vote count ${constituencyName}, winning candidate ${constituencyName}`,
-  };
+  // Base title and description
+  const baseTitle = `${constituencyName} Election Results | AC ${acNumber}`;
+  const title = hasPrediction
+    ? `${constituencyName} 2026 Prediction & Results | ${predictedWinner} Alliance Forecast`
+    : `${baseTitle} | MLA, Vote Count & Analysis`;
+
+  const baseDescription = `Complete election results for ${constituencyName} constituency${districtText}. View 2021, 2016, and 2011 results, winning candidates, vote counts, margins, and historical electoral trends.`;
+  const description = hasPrediction
+    ? `${constituencyName} 2026 election prediction: ${predictedWinner} alliance likely to win. ${baseDescription} Plus data-driven 2026 forecast with confidence levels.`
+    : baseDescription;
+
+  // Base keywords
+  const baseKeywords = [
+    `${constituencyName} election results`,
+    `${constituencyName} MLA`,
+    `${constituencyName} assembly constituency`,
+    district ? `${district} constituency` : '',
+    `Tamil Nadu AC ${acNumber}`,
+    `vote count ${constituencyName}`,
+    `winning candidate ${constituencyName}`,
+  ].filter(Boolean);
+
+  // Add prediction keywords if available
+  const predictionKeywords = hasPrediction
+    ? [
+        `${constituencyName} 2026 prediction`,
+        `${constituencyName} 2026 election forecast`,
+        `who will win ${constituencyName} 2026`,
+        `${constituencyName} 2026 winner`,
+        `${predictedWinner} ${constituencyName}`,
+        `${constituencyName} assembly election 2026`,
+        `${constituencyName} 2026 forecast`,
+      ]
+    : [];
+
+  const keywords = [...predictionKeywords, ...baseKeywords].join(', ');
+
+  return { title, description, keywords };
 }
 
 /**

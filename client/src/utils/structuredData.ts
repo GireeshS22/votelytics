@@ -134,3 +134,89 @@ export function generateDatasetSchema(name: string, description: string) {
     temporalCoverage: '2011/2021',
   };
 }
+
+/**
+ * Event schema for 2026 election prediction
+ */
+export function generatePredictionEventSchema(
+  constituency: {
+    name: string;
+    district: string | null;
+    ac_number: number;
+  },
+  prediction: {
+    predicted_winner_alliance: string;
+    predicted_winner_party: string;
+    confidence_level: string;
+    win_probability: number;
+  }
+) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Event',
+    name: `2026 Tamil Nadu Assembly Election - ${constituency.name}`,
+    description: `Election prediction for ${constituency.name} constituency (AC ${constituency.ac_number}). Predicted winner: ${prediction.predicted_winner_alliance} alliance led by ${prediction.predicted_winner_party}. Confidence: ${prediction.confidence_level} (${prediction.win_probability}% probability).`,
+    startDate: '2026-04-01', // Expected election date
+    endDate: '2026-04-01',
+    eventStatus: 'https://schema.org/EventScheduled',
+    eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+    location: {
+      '@type': 'Place',
+      name: constituency.name,
+      address: {
+        '@type': 'PostalAddress',
+        addressRegion: 'Tamil Nadu',
+        addressLocality: constituency.district || '',
+        addressCountry: 'IN',
+      },
+    },
+    organizer: {
+      '@type': 'Organization',
+      name: 'Election Commission of India',
+      url: 'https://eci.gov.in',
+    },
+    about: {
+      '@type': 'Thing',
+      name: `${prediction.predicted_winner_alliance} Alliance - ${constituency.name}`,
+      description: `Predicted to win ${constituency.name} in 2026 Tamil Nadu assembly election`,
+    },
+  };
+}
+
+/**
+ * Dataset schema for 2026 predictions page
+ */
+export function generatePredictionsDatasetSchema() {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Dataset',
+    name: '2026 Tamil Nadu Assembly Election Predictions',
+    description: 'Comprehensive data-driven predictions for all 234 constituencies in Tamil Nadu 2026 assembly elections. Includes alliance-wise seat distribution, constituency-level forecasts, winning probabilities, and confidence levels.',
+    keywords: [
+      '2026 election predictions',
+      'Tamil Nadu assembly election',
+      'seat forecast 2026',
+      'DMK AIADMK predictions',
+      'constituency predictions',
+      'election forecast',
+      'Tamil Nadu 2026',
+    ].join(', '),
+    creator: {
+      '@type': 'Organization',
+      name: SEO_CONFIG.organization.name,
+      url: SEO_CONFIG.siteUrl,
+    },
+    spatialCoverage: {
+      '@type': 'Place',
+      name: 'Tamil Nadu, India',
+    },
+    temporalCoverage: '2026',
+    datePublished: '2025-11-09',
+    dateModified: new Date().toISOString().split('T')[0],
+    distribution: {
+      '@type': 'DataDownload',
+      encodingFormat: 'application/json',
+      contentUrl: `${SEO_CONFIG.siteUrl}/predictions`,
+    },
+  };
+}

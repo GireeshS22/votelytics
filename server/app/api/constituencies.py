@@ -90,10 +90,10 @@ def get_constituency_by_slug(slug: str, db: Session = Depends(get_db)):
     """
     Get constituency information by SEO-friendly slug
     Example: /constituencies/slug/gummidipoondi
-    Handles malformed URLs with parentheses by normalizing them
+    Handles malformed URLs with parentheses and periods by normalizing them
     """
-    # Normalize slug: remove parentheses and collapse multiple hyphens
-    normalized_slug = re.sub(r'[()]', '', slug)  # Remove parentheses
+    # Normalize slug: remove parentheses, periods, and collapse multiple hyphens
+    normalized_slug = re.sub(r'[().]', '', slug)  # Remove parentheses and periods
     normalized_slug = re.sub(r'-+', '-', normalized_slug)  # Collapse multiple hyphens
     normalized_slug = normalized_slug.strip('-')  # Remove leading/trailing hyphens
 

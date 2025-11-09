@@ -9,7 +9,7 @@ import ElectionResults from '../components/constituency/ElectionResults';
 import PredictionSection from '../components/constituency/PredictionSection';
 import MetaTags from '../components/SEO/MetaTags';
 import { getConstituencySEO, SEO_CONFIG } from '../utils/seoConfig';
-import { generateConstituencySchema, generateBreadcrumbSchema } from '../utils/structuredData';
+import { generateConstituencySchema, generateBreadcrumbSchema, generatePredictionEventSchema } from '../utils/structuredData';
 import type { Constituency } from '../types/constituency';
 import type { ElectionResult } from '../types/election';
 import type { PredictionDetail } from '../types/prediction';
@@ -22,14 +22,34 @@ function ConstituencyDetail() {
   const [results2021, setResults2021] = useState<ElectionResult[]>([]);
   const [results2016, setResults2016] = useState<ElectionResult[]>([]);
   const [results2011, setResults2011] = useState<ElectionResult[]>([]);
+  const [allConstituencies, setAllConstituencies] = useState<Constituency[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Fetch all constituencies once for navigation
+  useEffect(() => {
+    loadAllConstituencies();
+  }, []);
+
+  // Load current constituency data when slug changes
   useEffect(() => {
     if (slug) {
       loadData();
     }
   }, [slug]);
+
+  const loadAllConstituencies = async () => {
+    try {
+      const data = await constituenciesAPI.getAll({ limit: 500 });
+      // Sort by ac_number to maintain constituency order (1-234)
+      const sortedConstituencies = data.constituencies.sort(
+        (a, b) => a.ac_number - b.ac_number
+      );
+      setAllConstituencies(sortedConstituencies);
+    } catch (err) {
+      console.error('Error loading constituencies:', err);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -111,11 +131,21 @@ function ConstituencyDetail() {
     );
   }
 
-  // Generate SEO data dynamically based on constituency
+  // Calculate prev/next constituencies based on ac_number order
+  const currentIndex = allConstituencies.findIndex(c => c.id === constituency.id);
+  const prevConstituency = currentIndex > 0 ? allConstituencies[currentIndex - 1] : null;
+  const nextConstituency = currentIndex < allConstituencies.length - 1 ? allConstituencies[currentIndex + 1] : null;
+
+  // Generate SEO data dynamically based on constituency and prediction
+  const hasPrediction = prediction !== null;
+  const predictedWinner = prediction?.predicted_winner_alliance;
+
   const seoData = getConstituencySEO(
     constituency.name,
     constituency.district,
-    constituency.ac_number
+    constituency.ac_number,
+    hasPrediction,
+    predictedWinner
   );
 
   // Generate structured data for constituency
@@ -126,9 +156,16 @@ function ConstituencyDetail() {
     { name: constituency.name, url: `${SEO_CONFIG.siteUrl}/constituency/${constituency.slug}` },
   ]);
 
+  // Add prediction event schema if prediction exists
+  const schemas = [constituencySchema, breadcrumbSchema];
+  if (hasPrediction && prediction) {
+    const predictionSchema = generatePredictionEventSchema(constituency, prediction);
+    schemas.push(predictionSchema);
+  }
+
   const combinedStructuredData = {
     '@context': 'https://schema.org',
-    '@graph': [constituencySchema, breadcrumbSchema],
+    '@graph': schemas,
   };
 
   return (
@@ -145,7 +182,11 @@ function ConstituencyDetail() {
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50">
       <div className="container mx-auto px-4 py-8 max-w-[1800px]">
         {/* Constituency Header */}
-        <ConstituencyHeader constituency={constituency} />
+        <ConstituencyHeader
+          constituency={constituency}
+          prevConstituency={prevConstituency}
+          nextConstituency={nextConstituency}
+        />
 
         {/* 2026 Prediction Section */}
         {prediction && <PredictionSection prediction={prediction} />}

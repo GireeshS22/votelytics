@@ -6,6 +6,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { predictionsAPI } from '../services/api';
 import { getPartyColor } from '../utils/partyColors';
+import MetaTags from '../components/SEO/MetaTags';
+import { PAGE_SEO, SEO_CONFIG } from '../utils/seoConfig';
+import { generatePredictionsDatasetSchema, generateWebsiteSchema, generateBreadcrumbSchema } from '../utils/structuredData';
 import type { PredictionsSummary, Prediction } from '../types/prediction';
 
 /**
@@ -175,10 +178,35 @@ const Predictions = () => {
     );
   }
 
+  // Generate structured data for predictions page
+  const breadcrumbSchema = generateBreadcrumbSchema([
+    { name: 'Home', url: SEO_CONFIG.siteUrl },
+    { name: '2026 Predictions', url: `${SEO_CONFIG.siteUrl}/predictions` },
+  ]);
+
+  const combinedStructuredData = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      generateWebsiteSchema(),
+      generatePredictionsDatasetSchema(),
+      breadcrumbSchema,
+    ],
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Page Header */}
-      <div className="bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 py-8 md:py-12">
+    <>
+      {/* SEO Meta Tags */}
+      <MetaTags
+        title={PAGE_SEO.predictions.title}
+        description={PAGE_SEO.predictions.description}
+        keywords={PAGE_SEO.predictions.keywords}
+        canonical={`${SEO_CONFIG.siteUrl}/predictions`}
+        structuredData={combinedStructuredData}
+      />
+
+      <div className="min-h-screen bg-gray-50">
+        {/* Page Header */}
+        <div className="bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 py-8 md:py-12">
         <div className="container mx-auto px-4 max-w-7xl">
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
             2026 Tamil Nadu Assembly Election Predictions
@@ -590,7 +618,8 @@ const Predictions = () => {
           </div>
         </div>
       </section>
-    </div>
+      </div>
+    </>
   );
 };
 
