@@ -6,9 +6,11 @@ import type { Constituency } from '../../types/constituency';
 
 interface ConstituencyHeaderProps {
   constituency: Constituency;
+  prevConstituency?: Constituency | null;
+  nextConstituency?: Constituency | null;
 }
 
-function ConstituencyHeader({ constituency }: ConstituencyHeaderProps) {
+function ConstituencyHeader({ constituency, prevConstituency, nextConstituency }: ConstituencyHeaderProps) {
   const navigate = useNavigate();
 
   return (
@@ -21,42 +23,89 @@ function ConstituencyHeader({ constituency }: ConstituencyHeaderProps) {
 
       {/* Content */}
       <div className="relative z-10">
-        {/* Back Buttons */}
-        <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-white hover:text-blue-100 transition-all bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg backdrop-blur-sm border border-white/20"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+        {/* Navigation - Back Buttons (Left) and Prev/Next (Right) */}
+        <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
+          {/* Left side - Back buttons */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/')}
+              className="flex items-center gap-2 text-white hover:text-blue-100 transition-all bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg backdrop-blur-sm border border-white/20"
             >
-              <path d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            <span className="font-medium">Back to Map</span>
-          </button>
-          <button
-            onClick={() => navigate('/predictions')}
-            className="flex items-center gap-2 text-white hover:text-blue-100 transition-all bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg backdrop-blur-sm border border-white/20"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              <span className="font-medium">Back to Map</span>
+            </button>
+            <button
+              onClick={() => navigate('/predictions')}
+              className="flex items-center gap-2 text-white hover:text-blue-100 transition-all bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg backdrop-blur-sm border border-white/20"
             >
-              <path d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            <span className="font-medium">Back to Predictions</span>
-          </button>
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              <span className="font-medium">Back to Predictions</span>
+            </button>
+          </div>
+
+          {/* Right side - Prev/Next buttons */}
+          <div className="flex items-center gap-3">
+            {prevConstituency && (
+              <button
+                onClick={() => navigate(`/constituency/${prevConstituency.slug}`)}
+                className="flex items-center gap-2 text-white hover:text-blue-100 transition-all bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg backdrop-blur-sm border border-white/20"
+                aria-label={`Previous constituency: ${prevConstituency.name}`}
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path d="M15 19l-7-7 7-7" />
+                </svg>
+                <span className="font-medium hidden md:inline">Previous</span>
+              </button>
+            )}
+            {nextConstituency && (
+              <button
+                onClick={() => navigate(`/constituency/${nextConstituency.slug}`)}
+                className="flex items-center gap-2 text-white hover:text-blue-100 transition-all bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg backdrop-blur-sm border border-white/20"
+                aria-label={`Next constituency: ${nextConstituency.name}`}
+              >
+                <span className="font-medium hidden md:inline">Next</span>
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Constituency Info */}

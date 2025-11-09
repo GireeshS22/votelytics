@@ -183,12 +183,18 @@ function Home() {
             </div>
 
             {/* Feature Links */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8 md:mb-10">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-8 md:mb-10">
               <button
                 onClick={scrollToMap}
                 className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-3 rounded-lg font-semibold hover:from-green-600 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl hover:scale-105 text-sm md:text-base"
               >
                 Interactive Map
+              </button>
+              <button
+                onClick={() => navigate('/predictions')}
+                className="bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white px-4 py-3 rounded-lg font-semibold hover:from-pink-600 hover:via-purple-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl hover:scale-105 text-sm md:text-base"
+              >
+                2026 Predictions
               </button>
               <button
                 onClick={() => navigate('/analysis/swing')}
