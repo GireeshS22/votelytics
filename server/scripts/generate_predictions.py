@@ -13,6 +13,7 @@ from datetime import datetime
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from app.database import SessionLocal
 from app.models.constituency import Constituency
 from app.models.prediction import Prediction
@@ -24,27 +25,72 @@ from app.services.prediction_generator import (
 )
 
 
-def get_constituencies_needing_predictions(db: Session, year: int, constituency_ids=None):
-    """Get constituencies that need predictions"""
-    if constituency_ids:
-        # Specific constituencies
-        return db.query(Constituency).filter(
-            Constituency.id.in_(constituency_ids)
-        ).order_by(Constituency.ac_number).all()
+def get_current_version(db: Session, year: int) -> int:
+    """
+    Get the current version to work on.
+    If latest version has all 234 predictions, return next version.
+    Otherwise, return the latest version to continue filling it.
+    """
+    max_version = db.query(func.max(Prediction.version)).filter(
+        Prediction.predicted_year == year
+    ).scalar()
+
+    if max_version is None:
+        return 1
+
+    # Count predictions for the max version
+    count = db.query(func.count(Prediction.id)).filter(
+        Prediction.predicted_year == year,
+        Prediction.version == max_version
+    ).scalar()
+
+    # If max version has all 234 predictions, start next version
+    if count >= 234:
+        return max_version + 1
     else:
-        # All constituencies without predictions for this year
-        existing_predictions = db.query(Prediction.constituency_id).filter(
-            Prediction.predicted_year == year
-        ).all()
-        existing_ids = [p[0] for p in existing_predictions]
+        # Continue with the current version
+        return max_version
 
-        return db.query(Constituency).filter(
+
+def get_constituencies_to_process(db: Session, year: int, version: int, constituency_ids=None, limit=None):
+    """Get constituencies that don't have predictions for the given version"""
+    # Find constituencies that already have predictions for this version
+    existing = db.query(Prediction.constituency_id).filter(
+        Prediction.predicted_year == year,
+        Prediction.version == version
+    ).all()
+    existing_ids = [p[0] for p in existing]
+
+    if constituency_ids:
+        # Specific constituencies, excluding those already done
+        query = db.query(Constituency).filter(
+            Constituency.id.in_(constituency_ids),
             ~Constituency.id.in_(existing_ids) if existing_ids else True
-        ).order_by(Constituency.ac_number).all()
+        ).order_by(Constituency.ac_number)
+    else:
+        # All constituencies without predictions for this version
+        query = db.query(Constituency).filter(
+            ~Constituency.id.in_(existing_ids) if existing_ids else True
+        ).order_by(Constituency.ac_number)
+
+    if limit:
+        query = query.limit(limit)
+
+    return query.all()
 
 
-def save_prediction(db: Session, prediction_data: dict) -> bool:
-    """Save prediction to database"""
+def delete_version_predictions(db: Session, year: int, version: int) -> int:
+    """Delete all predictions for a specific version"""
+    count = db.query(Prediction).filter(
+        Prediction.predicted_year == year,
+        Prediction.version == version
+    ).delete()
+    db.commit()
+    return count
+
+
+def save_prediction(db: Session, prediction_data: dict, version: int) -> bool:
+    """Save prediction to database with version"""
     try:
         # Convert top_alliances to JSON-serializable format
         top_candidates_json = []
@@ -57,6 +103,7 @@ def save_prediction(db: Session, prediction_data: dict) -> bool:
         prediction = Prediction(
             constituency_id=prediction_data['constituency_id'],
             predicted_year=prediction_data['predicted_year'],
+            version=version,
             predicted_winner_party=prediction_data['predicted_winner_party'],
             predicted_winner_name=prediction_data.get('predicted_winner_name'),
             confidence_level=prediction_data['confidence_level'],
@@ -127,12 +174,29 @@ def main():
         help="Pause after N constituencies (default: 10)"
     )
     parser.add_argument(
-        "--overwrite",
-        action="store_true",
-        help="Overwrite existing predictions"
+        "--limit",
+        type=int,
+        default=None,
+        help="Limit number of constituencies to process (for incremental runs)"
+    )
+    parser.add_argument(
+        "--delete-version",
+        type=int,
+        default=None,
+        help="Delete all predictions for a specific version and exit"
     )
 
     args = parser.parse_args()
+
+    # Handle delete-version command
+    if args.delete_version:
+        db = SessionLocal()
+        try:
+            count = delete_version_predictions(db, args.year, args.delete_version)
+            print(f"Deleted {count} predictions for version {args.delete_version}")
+        finally:
+            db.close()
+        return
 
     # Validate API key
     if not settings.OPENAI_API_KEY:
@@ -174,24 +238,24 @@ def main():
     db = SessionLocal()
 
     try:
-        # Get constituencies to process
+        # Determine version for this prediction run
+        next_version = get_current_version(db, args.year)
+
+        # Count existing predictions for this version
+        existing_count = db.query(func.count(Prediction.id)).filter(
+            Prediction.predicted_year == args.year,
+            Prediction.version == next_version
+        ).scalar()
+
+        print(f"Prediction version: {next_version}")
+        print(f"Already completed: {existing_count}/234")
+        print()
+
+        # Get constituencies to process (those missing predictions for this version)
         print("Checking database...")
-        if args.overwrite and constituency_ids:
-            # Delete existing predictions
-            db.query(Prediction).filter(
-                Prediction.constituency_id.in_(constituency_ids),
-                Prediction.predicted_year == args.year
-            ).delete()
-            db.commit()
-            constituencies = db.query(Constituency).filter(
-                Constituency.id.in_(constituency_ids)
-            ).order_by(Constituency.ac_number).all()
-        elif constituency_ids:
-            constituencies = db.query(Constituency).filter(
-                Constituency.id.in_(constituency_ids)
-            ).order_by(Constituency.ac_number).all()
-        else:
-            constituencies = get_constituencies_needing_predictions(db, args.year)
+        constituencies = get_constituencies_to_process(
+            db, args.year, next_version, constituency_ids, args.limit
+        )
 
         total_count = len(constituencies)
         print(f"Found {total_count} constituencies to process")
@@ -202,7 +266,7 @@ def main():
             return
 
         # Confirm
-        response = input(f"Proceed with generating predictions for {total_count} constituencies? (yes/no): ")
+        response = input(f"Proceed with generating version {next_version} predictions for {total_count} constituencies? (yes/no): ")
         if response.lower() != "yes":
             print("Aborted.")
             return
@@ -238,8 +302,8 @@ def main():
                 print(f"    Vote Share: {prediction_data['predicted_vote_share']:.1f}% (Margin: {prediction_data['predicted_margin_pct']:.1f}%)")
 
                 # Save to database
-                if save_prediction(db, prediction_data):
-                    print(f"    ✓ Saved to database")
+                if save_prediction(db, prediction_data, next_version):
+                    print(f"    ✓ Saved to database (version {next_version})")
                     successful += 1
                 else:
                     print(f"    ✗ Failed to save")
@@ -277,6 +341,7 @@ def main():
         print("=" * 80)
         print("SUMMARY")
         print("=" * 80)
+        print(f"Version: {next_version}")
         print(f"Total processed: {total_count}")
         print(f"Successful: {successful}")
         print(f"Failed: {failed}")

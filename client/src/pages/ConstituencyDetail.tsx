@@ -19,6 +19,7 @@ function ConstituencyDetail() {
 
   const [constituency, setConstituency] = useState<Constituency | null>(null);
   const [prediction, setPrediction] = useState<PredictionDetail | null>(null);
+  const [previousPrediction, setPreviousPrediction] = useState<PredictionDetail | null>(null);
   const [results2021, setResults2021] = useState<ElectionResult[]>([]);
   const [results2016, setResults2016] = useState<ElectionResult[]>([]);
   const [results2011, setResults2011] = useState<ElectionResult[]>([]);
@@ -81,13 +82,15 @@ function ConstituencyDetail() {
       setResults2016(results2016Data);
       setResults2011(results2011Data);
 
-      // Fetch 2026 prediction (optional - don't fail if not found)
+      // Fetch 2026 prediction with previous version for trend comparison
       try {
-        const predictionData = await predictionsAPI.getByConstituency(constituencyData.id, 2026);
+        const predictionData = await predictionsAPI.getByConstituency(constituencyData.id, 2026, true);
         setPrediction(predictionData.prediction);
+        setPreviousPrediction(predictionData.previous_prediction || null);
       } catch (predErr) {
         console.log('No prediction found for this constituency');
         setPrediction(null);
+        setPreviousPrediction(null);
       }
 
     } catch (err) {
@@ -189,7 +192,12 @@ function ConstituencyDetail() {
         />
 
         {/* 2026 Prediction Section */}
-        {prediction && <PredictionSection prediction={prediction} />}
+        {prediction && (
+          <PredictionSection
+            prediction={prediction}
+            previousPrediction={previousPrediction}
+          />
+        )}
 
         {/* No Data Warning */}
         {results2021.length === 0 && results2016.length === 0 && results2011.length === 0 ? (

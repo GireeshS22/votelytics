@@ -14,6 +14,9 @@ class Prediction(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
+    # Version tracking (for multiple prediction runs)
+    version = Column(Integer, default=1, nullable=False, index=True)
+
     # Foreign keys
     constituency_id = Column(Integer, ForeignKey("constituencies.id"), nullable=False, index=True)
 

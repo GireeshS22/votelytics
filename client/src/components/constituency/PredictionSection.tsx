@@ -2,11 +2,22 @@
  * PredictionSection Component
  * Displays 2026 election prediction for a constituency
  */
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 import { getPartyColor } from '../../utils/partyColors';
 import type { PredictionDetail } from '../../types/prediction';
 
 interface PredictionSectionProps {
   prediction: PredictionDetail;
+  previousPrediction?: PredictionDetail | null;
 }
 
 /**
@@ -23,7 +34,7 @@ const getAllianceColor = (alliance: string): string => {
   return '#808080'; // Gray for others
 };
 
-function PredictionSection({ prediction }: PredictionSectionProps) {
+function PredictionSection({ prediction, previousPrediction }: PredictionSectionProps) {
   const allianceColor = getAllianceColor(prediction.predicted_winner_alliance);
 
   // Handle key_factors - can be string (old data) or array (new data)
@@ -112,50 +123,130 @@ function PredictionSection({ prediction }: PredictionSectionProps) {
             </div>
           </div>
 
-          {/* Vote Distribution Forecast */}
+          {/* Vote Share Trend Chart */}
           {topAlliances.length > 0 && (
             <div className="mb-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                <span>📊</span>
-                Vote Distribution Forecast
+                <span>📈</span>
+                Vote Share Trend
               </h3>
-              <div className="space-y-3">
-                {topAlliances.map((alliance, idx) => {
-                  const color = getAllianceColor(alliance.alliance);
-                  return (
-                    <div key={idx} className="flex items-center gap-3">
-                      {/* Alliance Name */}
-                      <div className="w-24 flex-shrink-0">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-2.5 h-2.5 rounded-full"
-                            style={{ backgroundColor: color }}
-                          ></div>
-                          <span className="text-sm font-semibold text-gray-700">
-                            {alliance.alliance}
-                          </span>
-                        </div>
-                      </div>
+              {(() => {
+                // Build chart data from predictions
+                const allAlliances = new Set<string>();
+                topAlliances.forEach((a) => allAlliances.add(a.alliance));
+                previousPrediction?.top_alliances?.forEach((a) => allAlliances.add(a.alliance));
 
-                      {/* Progress Bar */}
-                      <div className="flex-1 relative">
-                        <div className="h-8 bg-gray-100 rounded-lg overflow-hidden">
-                          <div
-                            className="h-full flex items-center justify-end px-3 text-white text-sm font-semibold transition-all duration-500"
-                            style={{
-                              width: `${alliance.vote_share}%`,
-                              backgroundColor: color,
-                              minWidth: alliance.vote_share > 5 ? 'auto' : '60px',
-                            }}
-                          >
-                            {alliance.vote_share.toFixed(1)}%
-                          </div>
+                // Helper to format date as "Mon YYYY"
+                const formatDate = (dateStr: string) => {
+                  const date = new Date(dateStr);
+                  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                };
+
+                // Create data points for each version
+                const chartData: Array<{ version: string; [key: string]: number | string }> = [];
+
+                // Add v1 data point if available
+                if (previousPrediction?.top_alliances) {
+                  const v1Data: { version: string; [key: string]: number | string } = {
+                    version: formatDate(previousPrediction.created_at),
+                  };
+                  previousPrediction.top_alliances.forEach((a) => {
+                    v1Data[a.alliance] = a.vote_share;
+                  });
+                  chartData.push(v1Data);
+                }
+
+                // Add current version data point
+                const currentData: { version: string; [key: string]: number | string } = {
+                  version: formatDate(prediction.created_at),
+                };
+                topAlliances.forEach((a) => {
+                  currentData[a.alliance] = a.vote_share;
+                });
+                chartData.push(currentData);
+
+                // Get alliance list sorted by current vote share
+                const allianceList = Array.from(allAlliances).sort((a, b) => {
+                  const aShare = topAlliances.find((x) => x.alliance === a)?.vote_share || 0;
+                  const bShare = topAlliances.find((x) => x.alliance === b)?.vote_share || 0;
+                  return bShare - aShare;
+                });
+
+                return (
+                  <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                        <XAxis
+                          dataKey="version"
+                          tick={{ fill: '#6B7280', fontSize: 12 }}
+                          axisLine={{ stroke: '#E5E7EB' }}
+                        />
+                        <YAxis
+                          domain={[0, 50]}
+                          tick={{ fill: '#6B7280', fontSize: 12 }}
+                          axisLine={{ stroke: '#E5E7EB' }}
+                          tickFormatter={(value) => `${value}%`}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'white',
+                            border: '1px solid #E5E7EB',
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                          }}
+                          formatter={(value: number) => [`${value.toFixed(1)}%`, '']}
+                        />
+                        <Legend />
+                        {allianceList.map((alliance) => (
+                          <Line
+                            key={alliance}
+                            type="monotone"
+                            dataKey={alliance}
+                            stroke={getAllianceColor(alliance)}
+                            strokeWidth={3}
+                            dot={{ r: 6, fill: getAllianceColor(alliance) }}
+                            activeDot={{ r: 8 }}
+                            connectNulls
+                          />
+                        ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+
+                    {/* Trend Summary below chart */}
+                    {previousPrediction && (
+                      <div className="mt-4 pt-4 border-t border-gray-100">
+                        <div className="flex flex-wrap gap-4 justify-center">
+                          {allianceList.map((alliance) => {
+                            const current = topAlliances.find((a) => a.alliance === alliance)?.vote_share;
+                            const prev = previousPrediction.top_alliances?.find((a) => a.alliance === alliance)?.vote_share;
+                            if (current === undefined || prev === undefined) return null;
+                            const change = current - prev;
+                            if (Math.abs(change) < 0.1) return null;
+
+                            return (
+                              <div key={alliance} className="flex items-center gap-2 text-sm">
+                                <div
+                                  className="w-3 h-3 rounded-full"
+                                  style={{ backgroundColor: getAllianceColor(alliance) }}
+                                ></div>
+                                <span className="font-medium text-gray-700">{alliance}</span>
+                                <span
+                                  className={`font-semibold ${
+                                    change > 0 ? 'text-green-600' : 'text-red-600'
+                                  }`}
+                                >
+                                  {change > 0 ? '↑' : '↓'} {Math.abs(change).toFixed(1)}%
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 

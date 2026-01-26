@@ -17,6 +17,7 @@ class PredictionBase(BaseModel):
     """Base prediction schema"""
     constituency_id: int
     predicted_year: int = 2026
+    version: int = Field(default=1, description="Prediction version number")
     predicted_winner_alliance: str = Field(..., description="Winning alliance (DMK+, AIADMK+, etc.)")
     predicted_winner_party: str = Field(..., description="Specific party winning the seat")
     predicted_winner_name: Optional[str] = None

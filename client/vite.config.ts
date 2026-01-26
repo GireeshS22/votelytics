@@ -45,6 +45,6 @@ export default defineConfig({
 
   // Optimize dependencies
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom', 'leaflet', 'react-leaflet'],
+    include: ['react', 'react-dom', 'react-router-dom', 'leaflet', 'react-leaflet', 'react-is', 'recharts'],
   },
 })

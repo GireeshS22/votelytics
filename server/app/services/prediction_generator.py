@@ -10,6 +10,7 @@ import time
 
 from app.models.constituency import Constituency
 from app.models.election import ElectionResult
+from app.models.prediction import Prediction
 from app.schemas.prediction import ChatGPTResponse
 
 
@@ -24,8 +25,8 @@ def load_trends_summary(trends_file_path: str) -> str:
     with open(trends_file_path, 'r') as f:
         full_text = f.read()
 
-    # Extract key sections for concise summary
-    summary = """CURRENT POLITICAL CONTEXT (2025):
+    # Extract key sections for concise summary - Updated January 2026
+    summary = """CURRENT POLITICAL CONTEXT (January 2026):
 
 GOVERNMENT: DMK incumbent (2021-2026) facing mixed performance
 - Criticized for law & order failures and corruption allegations
@@ -33,17 +34,20 @@ GOVERNMENT: DMK incumbent (2021-2026) facing mixed performance
 - Clean sweep in 2024 Lok Sabha (39/39 seats) provides momentum
 - Significant anti-incumbency sentiment detected
 
-ALLIANCES (2026):
-- DMK-led Secular Progressive Alliance (SPA) - 13 partners
-- AIADMK-BJP NDA alliance (reunited April 2025, EPS as CM candidate)
-- TVK (Actor Vijay) - new entrant, solo/PMK alliance discussions
+ALLIANCES (January 2026 - UPDATED):
+- DMK-led Secular Progressive Alliance (SPA) - 13 partners, largely intact
+- AIADMK-BJP NDA alliance - CONSOLIDATED with PMK (Anbumani) and AMMK joining
+- TVK (Actor Vijay) - standalone, KA Sengottaiyan joined as chief coordinator (Nov 2025)
 - NTK (Seeman) - standalone, contesting all 234 seats
+- DMDK - undecided as of Jan 25, 2026
 
-MAJOR DEVELOPMENTS (2025):
-- AIADMK-BJP alliance formalized April 2025
-- PMK internal split (leadership dispute)
-- TVK Karur stampede incident (September 2025)
-- Four-way contest anticipated
+MAJOR DEVELOPMENTS (Late 2025 - January 2026):
+- PMK (Anbumani faction) joined NDA - January 7, 2026
+- AMMK (TTV Dhinakaran) rejoined NDA - January 22-23, 2026
+- KA Sengottaiyan (ex-AIADMK) joined TVK - November 2025
+- PM Modi rally at Madurantakam - January 23, 2026 (unified NDA front, EPS as CM candidate)
+- NDA consolidation gaining momentum
+- DMDK still undecided despite NDA efforts
 
 TOP VOTER CONCERNS:
 1. Women Safety (27.3%)
@@ -55,15 +59,17 @@ TOP VOTER CONCERNS:
 
 KEY DYNAMICS:
 - Tamil Nadu historically alternates DMK and AIADMK
+- NDA consolidation (PMK + AMMK) strengthens opposition front
 - Anti-incumbency vs welfare schemes
-- Four-way split may produce unpredictable swings
-- Urban: Safety, employment | Rural: Agriculture, liquor
+- Four-way split: DMK+ vs NDA vs TVK vs NTK
+- TVK as wildcard for splitting anti-incumbency votes
 
 PARTY PERFORMANCE CONTEXT:
 - NTK (Seeman): Historically gets 3-6% statewide, strong social media presence but limited ground impact
-- TVK (Vijay): New entrant with massive star power, potential for 10-20% vote share in competitive areas
-- PMK: Vanniyar base (6-8% statewide), currently split between factions
-- DMK+ vs AIADMK+: Primary contest for power, expect 35-50% each depending on constituency"""
+- TVK (Vijay): New entrant with massive star power, KA Sengottaiyan brings AIADMK cadre influence
+- PMK: Vanniyar base (6-8% statewide), now part of NDA (Anbumani faction)
+- AMMK: AIADMK splinter votes now consolidated back to NDA
+- DMK+ vs AIADMK+ (NDA): Primary contest for power, NDA stronger with consolidations"""
 
     return summary
 
@@ -90,7 +96,7 @@ def map_party_to_alliance(party: str, alliance_mapping: Dict) -> str:
     elif 'VCK' in party_normalized:
         return 'DMK+'
     elif 'PMK' in party_normalized:
-        return 'PMK'
+        return 'AIADMK+'  # PMK joined NDA January 2026
     elif 'NTK' in party_normalized or 'NAAM TAMILAR' in party_normalized:
         return 'NTK'
     elif 'MDMK' in party_normalized:
@@ -100,7 +106,7 @@ def map_party_to_alliance(party: str, alliance_mapping: Dict) -> str:
     elif 'MNM' in party_normalized:
         return 'DMK+'
     elif 'AMMK' in party_normalized:
-        return 'AMMK'
+        return 'AIADMK+'  # AMMK rejoined NDA January 2026
     elif 'DMDK' in party_normalized:
         return 'DMDK'
     else:
@@ -208,7 +214,8 @@ def fetch_constituency_historical_data(
 def build_prediction_prompt(
     constituency_data: Dict,
     alliance_config: Dict,
-    trends_summary: str
+    trends_summary: str,
+    previous_prediction: Optional[Dict] = None
 ) -> str:
     """Build comprehensive prompt for ChatGPT"""
 
@@ -222,8 +229,24 @@ DISTRICT: {const['district']} | REGION: {const['region']}
 DEMOGRAPHICS: Population {const['population']:,} | Urban {const['urban_pct']:.1f}% | Literacy {const['literacy_rate']:.1f}%
 
 {trends_summary}
+"""
 
-CURRENT ALLIANCE STRUCTURE (2026):
+    # Add previous prediction if available (for version 2+)
+    if previous_prediction:
+        prompt += f"""
+PREVIOUS PREDICTION (Version 1 - November 2025):
+- Predicted Winner: {previous_prediction.get('winner_alliance', 'N/A')} ({previous_prediction.get('winner_party', 'N/A')})
+- Vote Share: {previous_prediction.get('vote_share', 0):.1f}%
+- Margin: {previous_prediction.get('margin_pct', 0):.1f}%
+- Confidence: {previous_prediction.get('confidence_level', 'N/A')}
+- Key Factors: {previous_prediction.get('key_factors', 'N/A')[:300]}...
+
+NOTE: This is your previous prediction. Re-evaluate objectively based on the latest political context above.
+You may confirm, adjust margins, or change the winner - base your decision purely on evidence and political analysis.
+
+"""
+
+    prompt += """CURRENT ALLIANCE STRUCTURE (2026):
 """
 
     # Add alliance details
@@ -368,6 +391,35 @@ def call_chatgpt_for_prediction(
     return None
 
 
+def fetch_previous_prediction(
+    constituency_id: int,
+    db: Session,
+    year: int = 2026
+) -> Optional[Dict]:
+    """Fetch the most recent prediction for a constituency (for v2+ generation)"""
+    prediction = db.query(Prediction).filter(
+        Prediction.constituency_id == constituency_id,
+        Prediction.predicted_year == year
+    ).order_by(Prediction.version.desc()).first()
+
+    if not prediction:
+        return None
+
+    # Extract alliance from extra_data
+    winner_alliance = prediction.extra_data.get('predicted_winner_alliance') if prediction.extra_data else prediction.predicted_winner_party
+
+    return {
+        'version': prediction.version,
+        'winner_alliance': winner_alliance,
+        'winner_party': prediction.predicted_winner_party,
+        'vote_share': prediction.predicted_vote_share,
+        'margin_pct': prediction.predicted_margin_pct,
+        'confidence_level': prediction.confidence_level,
+        'win_probability': prediction.win_probability,
+        'key_factors': prediction.key_factors
+    }
+
+
 def generate_prediction_for_constituency(
     constituency_id: int,
     db: Session,
@@ -392,11 +444,15 @@ def generate_prediction_for_constituency(
         print(f"Failed to fetch data for constituency {constituency_id}")
         return None
 
+    # Fetch previous prediction (for v2+ context)
+    previous_prediction = fetch_previous_prediction(constituency_id, db)
+
     # Build prompt
     prompt = build_prediction_prompt(
         constituency_data=constituency_data,
         alliance_config=alliance_config,
-        trends_summary=trends_summary
+        trends_summary=trends_summary,
+        previous_prediction=previous_prediction
     )
 
     # Call ChatGPT
@@ -414,9 +470,10 @@ def generate_prediction_for_constituency(
     prediction_data['predicted_year'] = 2026
     prediction_data['prediction_model'] = 'ChatGPT'
     prediction_data['extra_data'] = {
-        'alliance_config_version': '2026_v1',
-        'trends_date': '2025-11',
-        'historical_data_years': [2021, 2016, 2011]
+        'alliance_config_version': '2026_v2',
+        'trends_date': '2026-01',
+        'historical_data_years': [2021, 2016, 2011],
+        'previous_prediction_version': previous_prediction.get('version') if previous_prediction else None
     }
 
     return prediction_data

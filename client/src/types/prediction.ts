@@ -16,6 +16,7 @@ export interface Prediction {
   predicted_vote_share: number;
   predicted_margin_pct: number;
   key_factors: string[] | string;
+  version: number;
   created_at: string;
 }
 
@@ -97,4 +98,9 @@ export interface PredictionFilters {
 export interface PredictionsListResponse {
   total: number;
   predictions: Prediction[];
+}
+
+export interface ConstituencyPredictionResponse {
+  prediction: PredictionDetail;
+  previous_prediction?: PredictionDetail | null;
 }

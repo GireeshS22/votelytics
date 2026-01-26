@@ -6,12 +6,12 @@ import axios from 'axios';
 import type { Constituency, ConstituencyList } from '../types/constituency';
 import type { Election, ElectionResult } from '../types/election';
 import type {
-  PredictionDetail,
   PredictionsSummary,
   RegionalSummary,
   PredictionComparison,
   PredictionFilters,
-  PredictionsListResponse
+  PredictionsListResponse,
+  ConstituencyPredictionResponse
 } from '../types/prediction';
 import { getCached, setCached, CACHE_KEYS, CACHE_TTL } from '../utils/cache';
 
@@ -350,14 +350,16 @@ export const predictionsAPI = {
 
   /**
    * Get detailed prediction for a specific constituency
+   * @param includePrevious - If true, includes previous version for trend comparison
    */
   getByConstituency: async (
     constituencyId: number,
-    year: number = 2026
-  ): Promise<{ prediction: PredictionDetail }> => {
+    year: number = 2026,
+    includePrevious: boolean = false
+  ): Promise<ConstituencyPredictionResponse> => {
     console.log(`🌐 Fetching prediction for constituency ${constituencyId}...`);
     const response = await apiClient.get(`/predictions/constituency/${constituencyId}`, {
-      params: { year }
+      params: { year, include_previous: includePrevious }
     });
     return response.data;
   },

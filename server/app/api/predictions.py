@@ -15,22 +15,30 @@ from app.models.election import ElectionResult
 router = APIRouter()
 
 
+def get_latest_version(db: Session, year: int) -> int:
+    """Get the latest prediction version for a given year"""
+    max_version = db.query(func.max(Prediction.version)).filter(
+        Prediction.predicted_year == year
+    ).scalar()
+    return max_version or 1
+
+
 def reclassify_confidence_level(win_probability: float, margin_pct: float) -> str:
     """
     Reclassify confidence level based on relaxed thresholds.
     Uses existing win_probability and margin_pct from database.
 
-    New Thresholds (Stricter):
+    Thresholds:
     - Safe: >60% probability AND >8% margin
     - Likely: 52-60% probability AND 5.5-8% margin
-    - Lean: 43-52% probability AND 1.82-5.5% margin
-    - Toss-up: <43% probability OR <1.82% margin
+    - Lean: 43-52% probability AND 1.25-5.5% margin
+    - Toss-up: <43% probability OR <1.25% margin
     """
     if win_probability > 0.60 and margin_pct > 8.0:
         return "Safe"
     elif win_probability > 0.52 and margin_pct > 5.5:
         return "Likely"
-    elif win_probability > 0.43 and margin_pct > 1.82:
+    elif win_probability > 0.43 and margin_pct > 1.25:
         return "Lean"
     else:
         return "Toss-up"
@@ -39,15 +47,20 @@ def reclassify_confidence_level(win_probability: float, margin_pct: float) -> st
 @router.get("/summary")
 async def get_predictions_summary(
     year: int = Query(default=2026, description="Election year"),
+    version: Optional[int] = Query(default=None, description="Prediction version (latest if not specified)"),
     db: Session = Depends(get_db)
 ):
     """
     Get summary of predictions by alliance and confidence level
     Used for bar chart and summary cards
     """
-    # Get all predictions for the year
+    # Get version (latest if not specified)
+    pred_version = version if version is not None else get_latest_version(db, year)
+
+    # Get all predictions for the year and version
     predictions = db.query(Prediction).filter(
-        Prediction.predicted_year == year
+        Prediction.predicted_year == year,
+        Prediction.version == pred_version
     ).all()
 
     if not predictions:
@@ -116,13 +129,15 @@ async def get_predictions_summary(
         "seat_distribution": seat_distribution,
         "toss_up": toss_up_count,
         "winner": winner,
-        "winning_margin": winning_margin
+        "winning_margin": winning_margin,
+        "version": pred_version
     }
 
 
 @router.get("/")
 async def get_all_predictions(
     year: int = Query(default=2026),
+    version: Optional[int] = Query(default=None, description="Prediction version (latest if not specified)"),
     alliance: Optional[str] = Query(default=None),
     confidence_level: Optional[str] = Query(default=None),
     region: Optional[str] = Query(default=None),
@@ -134,6 +149,9 @@ async def get_all_predictions(
     """
     Get all predictions with optional filtering
     """
+    # Get version (latest if not specified)
+    pred_version = version if version is not None else get_latest_version(db, year)
+
     # Base query joining with constituencies
     query = db.query(
         Prediction,
@@ -145,7 +163,8 @@ async def get_all_predictions(
         Constituency,
         Prediction.constituency_id == Constituency.id
     ).filter(
-        Prediction.predicted_year == year
+        Prediction.predicted_year == year,
+        Prediction.version == pred_version
     )
 
     # Apply SQL filters (except alliance and confidence_level which need reclassification)
@@ -199,6 +218,7 @@ async def get_all_predictions(
             "predicted_vote_share": pred.predicted_vote_share,
             "predicted_margin_pct": pred.predicted_margin_pct,
             "key_factors": key_factors_array,
+            "version": pred.version,
             "created_at": pred.created_at.isoformat()
         })
 
@@ -208,37 +228,13 @@ async def get_all_predictions(
 
     return {
         "total": total,
+        "version": pred_version,
         "predictions": predictions
     }
 
 
-@router.get("/constituency/{constituency_id}")
-async def get_constituency_prediction(
-    constituency_id: int,
-    year: int = Query(default=2026),
-    db: Session = Depends(get_db)
-):
-    """
-    Get detailed prediction for a specific constituency
-    """
-    # Get prediction
-    prediction = db.query(Prediction).filter(
-        Prediction.constituency_id == constituency_id,
-        Prediction.predicted_year == year
-    ).first()
-
-    if not prediction:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No prediction found for constituency {constituency_id} in {year}"
-        )
-
-    # Get constituency details
-    constituency = db.query(Constituency).filter(Constituency.id == constituency_id).first()
-
-    if not constituency:
-        raise HTTPException(status_code=404, detail="Constituency not found")
-
+def format_prediction_response(prediction: Prediction, constituency: Constituency) -> dict:
+    """Helper to format a prediction into API response format"""
     # Get alliance from extra_data
     alliance = prediction.extra_data.get('predicted_winner_alliance') if prediction.extra_data else prediction.predicted_winner_party
     top_alliances = prediction.extra_data.get('top_alliances', []) if prediction.extra_data else []
@@ -254,40 +250,100 @@ async def get_constituency_prediction(
         party = prediction.predicted_winner_party
 
     return {
-        "prediction": {
-            "id": prediction.id,
-            "constituency_id": prediction.constituency_id,
-            "constituency": {
-                "name": constituency.name,
-                "ac_number": constituency.ac_number,
-                "district": constituency.district,
-                "region": constituency.region,
-                "population": constituency.population,
-                "urban_pct": constituency.urban_population_pct,
-                "literacy_rate": constituency.literacy_rate
-            },
-            "predicted_winner_alliance": alliance,
-            "predicted_winner_party": party,
-            "confidence_level": reclassified_confidence,
-            "win_probability": prediction.win_probability,
-            "predicted_vote_share": prediction.predicted_vote_share,
-            "predicted_margin_pct": prediction.predicted_margin_pct,
-            "top_alliances": top_alliances,
-            "swing_from_last_election": prediction.swing_from_last_election,
-            "key_factors": prediction.key_factors,
-            "created_at": prediction.created_at.isoformat()
-        }
+        "id": prediction.id,
+        "constituency_id": prediction.constituency_id,
+        "constituency": {
+            "name": constituency.name,
+            "ac_number": constituency.ac_number,
+            "district": constituency.district,
+            "region": constituency.region,
+            "population": constituency.population,
+            "urban_pct": constituency.urban_population_pct,
+            "literacy_rate": constituency.literacy_rate
+        },
+        "predicted_winner_alliance": alliance,
+        "predicted_winner_party": party,
+        "confidence_level": reclassified_confidence,
+        "win_probability": prediction.win_probability,
+        "predicted_vote_share": prediction.predicted_vote_share,
+        "predicted_margin_pct": prediction.predicted_margin_pct,
+        "top_alliances": top_alliances,
+        "swing_from_last_election": prediction.swing_from_last_election,
+        "key_factors": prediction.key_factors,
+        "version": prediction.version,
+        "created_at": prediction.created_at.isoformat()
     }
+
+
+@router.get("/constituency/{constituency_id}")
+async def get_constituency_prediction(
+    constituency_id: int,
+    year: int = Query(default=2026),
+    version: Optional[int] = Query(default=None, description="Prediction version (latest if not specified)"),
+    include_previous: bool = Query(default=False, description="Include previous version for comparison"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get detailed prediction for a specific constituency.
+    Optionally include previous version for trend comparison.
+    """
+    # Get version (latest if not specified)
+    pred_version = version if version is not None else get_latest_version(db, year)
+
+    # Get prediction
+    prediction = db.query(Prediction).filter(
+        Prediction.constituency_id == constituency_id,
+        Prediction.predicted_year == year,
+        Prediction.version == pred_version
+    ).first()
+
+    if not prediction:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No prediction found for constituency {constituency_id} in {year}"
+        )
+
+    # Get constituency details
+    constituency = db.query(Constituency).filter(Constituency.id == constituency_id).first()
+
+    if not constituency:
+        raise HTTPException(status_code=404, detail="Constituency not found")
+
+    # Format main prediction
+    response = {
+        "prediction": format_prediction_response(prediction, constituency)
+    }
+
+    # Include previous version if requested
+    if include_previous and pred_version > 1:
+        previous_prediction = db.query(Prediction).filter(
+            Prediction.constituency_id == constituency_id,
+            Prediction.predicted_year == year,
+            Prediction.version == pred_version - 1
+        ).first()
+
+        if previous_prediction:
+            response["previous_prediction"] = format_prediction_response(previous_prediction, constituency)
+        else:
+            response["previous_prediction"] = None
+    elif include_previous:
+        response["previous_prediction"] = None
+
+    return response
 
 
 @router.get("/regional-summary")
 async def get_regional_summary(
     year: int = Query(default=2026),
+    version: Optional[int] = Query(default=None, description="Prediction version (latest if not specified)"),
     db: Session = Depends(get_db)
 ):
     """
     Get predictions summary by region
     """
+    # Get version (latest if not specified)
+    pred_version = version if version is not None else get_latest_version(db, year)
+
     # Get all predictions with constituencies
     predictions = db.query(
         Prediction,
@@ -296,7 +352,8 @@ async def get_regional_summary(
         Constituency,
         Prediction.constituency_id == Constituency.id
     ).filter(
-        Prediction.predicted_year == year
+        Prediction.predicted_year == year,
+        Prediction.version == pred_version
     ).all()
 
     # Structure data by region
@@ -320,7 +377,8 @@ async def get_regional_summary(
         regions[region]["total"] += 1
 
     return {
-        "regions": regions
+        "regions": regions,
+        "version": pred_version
     }
 
 
@@ -398,4 +456,39 @@ async def get_prediction_comparison(
         "from_year": from_year,
         "to_year": to_year,
         "comparison": comparison
+    }
+
+
+@router.get("/versions")
+async def get_available_versions(
+    year: int = Query(default=2026, description="Election year"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get list of available prediction versions for a year
+    """
+    # Get distinct versions with their creation dates
+    versions = db.query(
+        Prediction.version,
+        func.min(Prediction.created_at).label('created_at'),
+        func.count(Prediction.id).label('count')
+    ).filter(
+        Prediction.predicted_year == year
+    ).group_by(
+        Prediction.version
+    ).order_by(
+        Prediction.version.desc()
+    ).all()
+
+    return {
+        "year": year,
+        "versions": [
+            {
+                "version": v.version,
+                "created_at": v.created_at.isoformat() if v.created_at else None,
+                "prediction_count": v.count
+            }
+            for v in versions
+        ],
+        "latest_version": versions[0].version if versions else None
     }
