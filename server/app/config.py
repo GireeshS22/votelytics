@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     # OpenAI settings (for predictions and demographics)
     OPENAI_API_KEY: str = ""
 
+    # xAI / Grok settings (for V3+ batch predictions with X Search)
+    XAI_API_KEY: str = ""
+
     @field_validator("ADMIN_API_KEY")
     @classmethod
     def validate_admin_key(cls, v: str, info) -> str:

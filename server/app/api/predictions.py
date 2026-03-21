@@ -25,23 +25,22 @@ def get_latest_version(db: Session, year: int) -> int:
 
 def reclassify_confidence_level(win_probability: float, margin_pct: float) -> str:
     """
-    Reclassify confidence level based on relaxed thresholds.
-    Uses existing win_probability and margin_pct from database.
+    Classify confidence level from win_probability and margin_pct.
 
-    Thresholds:
-    - Safe: >60% probability AND >8% margin
-    - Likely: 52-60% probability AND 5.5-8% margin
-    - Lean: 43-52% probability AND 1.25-5.5% margin
-    - Toss-up: <43% probability OR <1.25% margin
+    Thresholds (calibrated for ~20 Toss-up seats across 234 TN constituencies):
+    - Safe    : >= 65% probability AND >= 10% margin
+    - Likely  : >= 55% probability AND >= 7% margin
+    - Lean    : everything else with a clear winner
+    - Toss-up : < 50% probability AND < 2.5% margin (genuinely too close to call)
     """
-    if win_probability > 0.60 and margin_pct > 8.0:
-        return "Safe"
-    elif win_probability > 0.52 and margin_pct > 5.5:
-        return "Likely"
-    elif win_probability > 0.43 and margin_pct > 1.25:
-        return "Lean"
-    else:
+    if win_probability < 0.50 and margin_pct < 2.5:
         return "Toss-up"
+    elif win_probability >= 0.65 and margin_pct >= 10.0:
+        return "Safe"
+    elif win_probability >= 0.55 and margin_pct >= 7.0:
+        return "Likely"
+    else:
+        return "Lean"
 
 
 @router.get("/summary")

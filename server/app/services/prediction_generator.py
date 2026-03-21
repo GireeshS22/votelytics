@@ -108,7 +108,7 @@ def map_party_to_alliance(party: str, alliance_mapping: Dict) -> str:
     elif 'AMMK' in party_normalized:
         return 'AIADMK+'  # AMMK rejoined NDA January 2026
     elif 'DMDK' in party_normalized:
-        return 'DMDK'
+        return 'DMK+'  # DMDK joined DMK+ alliance - March 2026
     else:
         return 'Others'
 
@@ -233,8 +233,11 @@ DEMOGRAPHICS: Population {const['population']:,} | Urban {const['urban_pct']:.1f
 
     # Add previous prediction if available (for version 2+)
     if previous_prediction:
+        _v_labels = {1: "November 2025", 2: "January 2026", 3: "March 2026"}
+        _v_num    = previous_prediction.get('version', 1)
+        _v_label  = _v_labels.get(_v_num, f"Version {_v_num}")
         prompt += f"""
-PREVIOUS PREDICTION (Version 1 - November 2025):
+PREVIOUS PREDICTION (Version {_v_num} — {_v_label}):
 - Predicted Winner: {previous_prediction.get('winner_alliance', 'N/A')} ({previous_prediction.get('winner_party', 'N/A')})
 - Vote Share: {previous_prediction.get('vote_share', 0):.1f}%
 - Margin: {previous_prediction.get('margin_pct', 0):.1f}%
@@ -251,7 +254,7 @@ You may confirm, adjust margins, or change the winner - base your decision purel
 
     # Add alliance details
     for alliance_name, alliance_info in alliance_config['alliances'].items():
-        if alliance_name in ['DMK+', 'AIADMK+', 'NTK', 'TVK']:
+        if alliance_name in ['DMK+', 'AIADMK+', 'NTK', 'TVK', 'DMDK']:
             partners = ', '.join([p['party'] for p in alliance_info['partners'][:5]])
             prompt += f"- {alliance_name}: {partners}\n"
 

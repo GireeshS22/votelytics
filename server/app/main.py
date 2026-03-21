@@ -49,7 +49,7 @@ async def health_check():
 
 
 # Import and include API routers
-from app.api import constituencies, elections, predictions
+from app.api import constituencies, elections, predictions, votes
 
 app.include_router(
     constituencies.router,
@@ -67,4 +67,10 @@ app.include_router(
     predictions.router,
     prefix="/api/predictions",
     tags=["Predictions"],
+)
+
+app.include_router(
+    votes.router,
+    prefix="/api/votes",
+    tags=["Votes"],
 )

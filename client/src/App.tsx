@@ -6,6 +6,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Header from './components/common/Header';
 import Footer from './components/common/Footer';
 import Home from './pages/Home';
+import VoteWidget from './components/VoteWidget';
 import './App.css';
 
 // Lazy load route components for better performance
@@ -16,6 +17,7 @@ const Analysis = lazy(() => import('./pages/Analysis'));
 const SwingAnalysis = lazy(() => import('./pages/SwingAnalysis'));
 const BastionAnalysis = lazy(() => import('./pages/BastionAnalysis'));
 const Predictions = lazy(() => import('./pages/Predictions'));
+const VoteResults = lazy(() => import('./pages/VoteResults'));
 const Terms = lazy(() => import('./pages/Terms'));
 const About = lazy(() => import('./pages/About'));
 
@@ -47,12 +49,14 @@ function App() {
               <Route path="/constituency" element={<ConstituencyList />} />
               <Route path="/constituency/:slug" element={<ConstituencyDetail />} />
               <Route path="/party/:partyName" element={<PartyProfile />} />
+              <Route path="/vote-results" element={<VoteResults />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/about" element={<About />} />
             </Routes>
           </Suspense>
         </main>
         <Footer />
+        <VoteWidget />
       </div>
     </Router>
   );

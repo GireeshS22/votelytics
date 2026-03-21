@@ -355,11 +355,12 @@ export const predictionsAPI = {
   getByConstituency: async (
     constituencyId: number,
     year: number = 2026,
-    includePrevious: boolean = false
+    includePrevious: boolean = false,
+    version?: number
   ): Promise<ConstituencyPredictionResponse> => {
     console.log(`🌐 Fetching prediction for constituency ${constituencyId}...`);
     const response = await apiClient.get(`/predictions/constituency/${constituencyId}`, {
-      params: { year, include_previous: includePrevious }
+      params: { year, include_previous: includePrevious, ...(version ? { version } : {}) }
     });
     return response.data;
   },
@@ -396,6 +397,45 @@ export const predictionsAPI = {
     const response = await apiClient.get<PredictionComparison>('/predictions/comparison', {
       params: { from_year: fromYear, to_year: toYear }
     });
+    return response.data;
+  },
+};
+
+// Votes API
+export const votesAPI = {
+  /**
+   * Cast a visitor poll vote
+   */
+  castVote: async (constituencyId: number, alliance: string, sessionId: string): Promise<{ success: boolean; vote_id: number }> => {
+    const response = await apiClient.post('/votes/', {
+      constituency_id: constituencyId,
+      alliance,
+      session_id: sessionId,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get statewide vote results
+   */
+  getAllResults: async (): Promise<{
+    total_votes: number;
+    results: Array<{ alliance: string; votes: number; percentage: number }>;
+  }> => {
+    const response = await apiClient.get('/votes/results');
+    return response.data;
+  },
+
+  /**
+   * Get vote results for a specific constituency
+   */
+  getConstituencyResults: async (constituencyId: number): Promise<{
+    constituency_id: number;
+    constituency_name: string;
+    total_votes: number;
+    results: Array<{ alliance: string; votes: number; percentage: number }>;
+  }> => {
+    const response = await apiClient.get(`/votes/results/${constituencyId}`);
     return response.data;
   },
 };
