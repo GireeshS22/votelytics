@@ -1,30 +1,19 @@
 """
-V3 Batch Prediction Generator — Grok + X Search
-=================================================
+V3 Prediction Generator — Grok + X Search
+==========================================
 Generates 2026 election predictions for all 234 Tamil Nadu constituencies
-using xAI Grok with live X Search via the Batch API (50% cost reduction).
+using xAI Grok with live X Search.
 
 Usage:
-    # Step 1: Submit all 234 requests as a single batch
-    poetry run python scripts/v3_batch_predictions.py --submit
-
-    # Step 2: Check progress (call anytime)
-    poetry run python scripts/v3_batch_predictions.py --status
-
-    # Step 3: Collect results and save to DB (once batch is complete)
-    poetry run python scripts/v3_batch_predictions.py --collect
-
-    # Step 3 (alternative): Wait for completion then auto-collect
-    poetry run python scripts/v3_batch_predictions.py --collect --wait
-
-    # Test with a few constituencies before full run
-    poetry run python scripts/v3_batch_predictions.py --submit --limit 5
+    poetry run python scripts/v3_batch_predictions.py
+    poetry run python scripts/v3_batch_predictions.py --limit 5
+    poetry run python scripts/v3_batch_predictions.py --constituency-ids 1,2,3
 """
 
 import sys
 import os
-import json
 import time
+import json
 import re
 import argparse
 from datetime import datetime
@@ -44,25 +33,21 @@ from app.models.prediction import Prediction
 from app.config import settings
 from app.services.prediction_generator import (
     load_alliance_config,
-    load_trends_summary,
     fetch_constituency_historical_data,
     build_prediction_prompt,
     fetch_previous_prediction,
 )
 
 
-# ── Constants ────────────────────────────────────────────────────────────────
+# ── Constants ─────────────────────────────────────────────────────────────────
 
-YEAR = 2026
+YEAR          = 2026
 DEFAULT_MODEL = "grok-4.20-0309-reasoning"
 
-_BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BATCH_STATE_FILE   = os.path.join(_BASE, "data", "batch_state_v3.json")
-ALLIANCE_CONFIG    = os.path.join(_BASE, "data", "alliance_config_2026.json")
-TRENDS_FILE        = os.path.join(_BASE, "data", "trends_2026_compiled.txt")
+_BASE           = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ALLIANCE_CONFIG = os.path.join(_BASE, "data", "alliance_config_2026.json")
+TRENDS_FILE     = os.path.join(_BASE, "data", "trends_2026_compiled.txt")
 
-# These are the exact fields save_prediction() reads from prediction_data.
-# Any Grok response missing one of these will be rejected before touching the DB.
 REQUIRED_FIELDS = [
     "predicted_winner_alliance",
     "predicted_winner_party",
@@ -78,30 +63,143 @@ REQUIRED_FIELDS = [
 VALID_CONFIDENCE_LEVELS = {"Safe", "Likely", "Lean", "Toss-up"}
 
 
-# ── JSON extraction ──────────────────────────────────────────────────────────
+# ── V3 combined trends ────────────────────────────────────────────────────────
+
+_V2_JANUARY_2026_CONTEXT = """
+================================================================================
+CONTEXT V2 — JANUARY 2026
+================================================================================
+GOVERNMENT: DMK incumbent (2021-2026) facing mixed performance
+- Criticized for law & order failures and corruption allegations
+- Strong on welfare schemes (women's assistance, free bus rides, breakfast schemes)
+- Clean sweep in 2024 Lok Sabha (39/39 seats) provides momentum
+- Significant anti-incumbency sentiment detected
+
+ALLIANCES (January 2026):
+- DMK-led Secular Progressive Alliance (SPA) - 13 partners, largely intact
+- AIADMK-BJP NDA alliance - CONSOLIDATED with PMK (Anbumani) and AMMK joining
+- TVK (Actor Vijay) - standalone, KA Sengottaiyan joined as chief coordinator (Nov 2025)
+- NTK (Seeman) - standalone, contesting all 234 seats
+- DMDK - undecided as of Jan 25, 2026
+
+MAJOR DEVELOPMENTS (Late 2025 - January 2026):
+- PMK (Anbumani faction) joined NDA - January 7, 2026
+- AMMK (TTV Dhinakaran) rejoined NDA - January 22-23, 2026
+- KA Sengottaiyan (ex-AIADMK) joined TVK - November 2025
+- PM Modi rally at Madurantakam - January 23, 2026 (unified NDA front, EPS as CM candidate)
+- NDA consolidation gaining momentum
+
+TOP VOTER CONCERNS:
+1. Women Safety (27.3%)
+2. Liquor & Drug Menace (21.8%)
+3. Unemployment (17.6%)
+4. Corruption (14.2%)
+5. Language/Cultural Identity (9.5%)
+6. Inflation (6.4%)
+
+KEY DYNAMICS:
+- Tamil Nadu historically alternates DMK and AIADMK
+- NDA consolidation (PMK + AMMK) strengthens opposition front
+- Anti-incumbency vs welfare schemes
+- Four-way split: DMK+ vs NDA vs TVK vs NTK
+- TVK as wildcard for splitting anti-incumbency votes
+"""
+
+_V3_MARCH_2026_CONTEXT = """
+================================================================================
+CONTEXT V3 — MARCH 2026 (PRE-ELECTION — SUPPLEMENT WITH X SEARCH)
+================================================================================
+ELECTION IMMINENT:
+- Tamil Nadu Assembly election due April-May 2026 (assembly term ends May 10, 2026)
+- Campaign period now active — candidates being finalised and announced
+
+ALLIANCE STATUS (March 2026 — CONFIRMED):
+- DMK+ (SPA): Now 14 partners — DMDK (Premallatha Vijayakant) officially joined March 2026
+  CM candidate: MK Stalin
+- AIADMK+ (NDA): AIADMK + BJP + PMK + AMMK — EPS as CM candidate
+- TVK (Vijay): Standalone — finalising candidate list
+- NTK (Seeman): Standalone — contesting all 234 seats
+
+IMPORTANT: Use your x_search results to update with the very latest — candidate names,
+recent rallies, local controversies, and current ground sentiment.
+"""
+
+
+def load_v3_combined_trends() -> str:
+    with open(TRENDS_FILE, "r") as f:
+        v1_context = f.read().strip()
+
+    v1_section = f"""================================================================================
+CONTEXT V1 — NOVEMBER 2025 (Original Research Compilation)
+================================================================================
+{v1_context}
+"""
+    return v1_section + _V2_JANUARY_2026_CONTEXT + _V3_MARCH_2026_CONTEXT
+
+
+# ── Prompt builder ────────────────────────────────────────────────────────────
+
+def build_grok_prompt(
+    constituency_data: dict,
+    alliance_config: dict,
+    trends_summary: str,
+    previous_prediction: dict | None,
+) -> str:
+    const = constituency_data["constituency"]
+
+    x_search_prefix = f"""STEP 1 — RESEARCH (do this first using x_search):
+Search X for ground-level information about this specific constituency before predicting.
+Run these searches:
+1. "{const['name']} election 2026"
+2. "{const['name']} candidate 2026"
+3. "{const['district']} Tamil Nadu politics 2026"
+4. "{const['name']} MLA"
+
+What to look for: candidate announcements, recent rallies, local MLA performance,
+caste-level dynamics, voter sentiment, any local controversies.
+
+STEP 2 — ANALYSE AND PREDICT (using everything below + your x_search findings):
+
+---
+
+"""
+
+    base_prompt = build_prediction_prompt(
+        constituency_data=constituency_data,
+        alliance_config=alliance_config,
+        trends_summary=trends_summary,
+        previous_prediction=previous_prediction,
+    )
+
+    base_prompt = base_prompt.replace(
+        "- Four-way contest dynamics",
+        "- Four-way contest dynamics\n- Your x_search findings about this specific constituency",
+    )
+
+    strict_suffix = """
+
+CRITICAL OUTPUT RULE:
+Your entire response must be ONLY the raw JSON object — no markdown, no code fences,
+no preamble, no explanation, no trailing text.
+Begin your response with { and end with }. Nothing else.
+"""
+
+    return x_search_prefix + base_prompt + strict_suffix
+
+
+# ── JSON extraction ───────────────────────────────────────────────────────────
 
 def extract_json_from_response(content: str) -> dict | None:
-    """
-    Robustly extract the prediction JSON from Grok's response.
-
-    Grok reasoning models may output thinking traces or preamble text before
-    the JSON. We try three strategies in order:
-      1. Direct parse (clean response)
-      2. Strip markdown code fences (```json ... ```)
-      3. Find the last/outermost {...} object in the string
-    """
     if not content:
         return None
 
     content = content.strip()
 
-    # Strategy 1: clean JSON
     try:
         return json.loads(content)
     except json.JSONDecodeError:
         pass
 
-    # Strategy 2: markdown code fence  ```json { ... } ```
     match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", content, re.DOTALL)
     if match:
         try:
@@ -109,8 +207,6 @@ def extract_json_from_response(content: str) -> dict | None:
         except json.JSONDecodeError:
             pass
 
-    # Strategy 3: find the last outermost { ... } block
-    # Reasoning models often put explanation first and JSON at the end.
     for start in reversed([m.start() for m in re.finditer(r"\{", content)]):
         depth = 0
         for i, ch in enumerate(content[start:]):
@@ -128,60 +224,46 @@ def extract_json_from_response(content: str) -> dict | None:
     return None
 
 
-# ── Validation ───────────────────────────────────────────────────────────────
+# ── Validation ────────────────────────────────────────────────────────────────
 
 def validate_and_normalise(data: dict) -> tuple[bool, str]:
-    """
-    Validate all required fields exist and have compatible types.
-    Normalises minor variations (e.g. capitalisation of confidence_level)
-    so downstream save_prediction() never sees unexpected values.
-
-    Returns (ok: bool, reason: str).
-    """
     for field in REQUIRED_FIELDS:
         if field not in data:
             return False, f"Missing required field: '{field}'"
 
-    # win_probability must be 0–1
     if not isinstance(data["win_probability"], (int, float)):
         return False, "win_probability must be numeric"
     if not 0 <= float(data["win_probability"]) <= 1:
-        # Grok sometimes returns 0–100 scale by mistake — fix it
         if 0 <= float(data["win_probability"]) <= 100:
             data["win_probability"] = float(data["win_probability"]) / 100
         else:
             return False, f"win_probability out of range: {data['win_probability']}"
 
-    # Vote share / margin must be numeric
     for field in ("predicted_vote_share", "predicted_margin_pct"):
         if not isinstance(data[field], (int, float)):
             return False, f"{field} must be numeric"
 
-    # swing can be negative — just must be numeric
     if not isinstance(data["swing_from_last_election"], (int, float)):
         return False, "swing_from_last_election must be numeric"
 
-    # top_alliances must be a non-empty list with 'alliance' and 'vote_share' keys
-    # This matches exactly what save_prediction() reads:
-    #   alliance.get('alliance') → top_candidates[i]['party']
-    #   alliance.get('vote_share') → top_candidates[i]['vote_share']
     if not isinstance(data["top_alliances"], list) or len(data["top_alliances"]) == 0:
         return False, "top_alliances must be a non-empty list"
     for item in data["top_alliances"]:
-        if "alliance" not in item:
-            return False, f"top_alliances item missing 'alliance' key: {item}"
-        if "vote_share" not in item:
-            return False, f"top_alliances item missing 'vote_share' key: {item}"
+        if "alliance" not in item or "vote_share" not in item:
+            return False, f"top_alliances item missing keys: {item}"
 
-    # Normalise confidence_level capitalisation
-    cl = str(data["confidence_level"]).strip()
-    normalised = {c.lower(): c for c in VALID_CONFIDENCE_LEVELS}
-    if cl not in VALID_CONFIDENCE_LEVELS:
-        if cl.lower() in normalised:
-            data["confidence_level"] = normalised[cl.lower()]
-        else:
-            # Fallback — don't reject, treat as Toss-up
-            data["confidence_level"] = "Toss-up"
+    # Always enforce confidence_level from the numbers — don't trust model's label.
+    # Thresholds calibrated so ~20 seats are Toss-up for 234-seat TN election.
+    wp     = float(data["win_probability"])
+    margin = float(data["predicted_margin_pct"])
+    if wp < 0.50 and margin < 2.5:
+        data["confidence_level"] = "Toss-up"
+    elif wp >= 0.65 and margin >= 10:
+        data["confidence_level"] = "Safe"
+    elif wp >= 0.55 and margin >= 7:
+        data["confidence_level"] = "Likely"
+    else:
+        data["confidence_level"] = "Lean"
 
     return True, "OK"
 
@@ -189,20 +271,7 @@ def validate_and_normalise(data: dict) -> tuple[bool, str]:
 # ── DB save ───────────────────────────────────────────────────────────────────
 
 def save_prediction(db: Session, prediction_data: dict, version: int) -> bool:
-    """
-    Save a single prediction to the DB.
-
-    IMPORTANT: This function is intentionally kept byte-for-byte identical
-    to save_prediction() in generate_predictions.py so that V3 rows are
-    structurally indistinguishable from V1/V2 rows in the predictions table.
-
-    The only V3-specific fields live inside extra_data (alliance_config_version,
-    trends_date, x_search_enabled, batch_id) which are additive and do not
-    affect any existing API parsing logic.
-    """
     try:
-        # Build top_candidates JSON exactly as V1/V2 does:
-        # alliance.get('alliance') is stored as 'party' — this is the V1/V2 contract.
         top_candidates_json = []
         for alliance in prediction_data.get("top_alliances", []):
             top_candidates_json.append({
@@ -241,121 +310,9 @@ def save_prediction(db: Session, prediction_data: dict, version: int) -> bool:
         return False
 
 
-# ── V3 combined trends ────────────────────────────────────────────────────────
+# ── Version detection ─────────────────────────────────────────────────────────
 
-# V2 January 2026 context — exactly what was fed to V2 predictions.
-# Kept here as a literal constant so V3 always has V2's baseline for comparison.
-_V2_JANUARY_2026_CONTEXT = """
-================================================================================
-CONTEXT V2 — JANUARY 2026
-================================================================================
-GOVERNMENT: DMK incumbent (2021-2026) facing mixed performance
-- Criticized for law & order failures and corruption allegations
-- Strong on welfare schemes (women's assistance, free bus rides, breakfast schemes)
-- Clean sweep in 2024 Lok Sabha (39/39 seats) provides momentum
-- Significant anti-incumbency sentiment detected
-
-ALLIANCES (January 2026):
-- DMK-led Secular Progressive Alliance (SPA) - 13 partners, largely intact
-- AIADMK-BJP NDA alliance - CONSOLIDATED with PMK (Anbumani) and AMMK joining
-- TVK (Actor Vijay) - standalone, KA Sengottaiyan joined as chief coordinator (Nov 2025)
-- NTK (Seeman) - standalone, contesting all 234 seats
-- DMDK - undecided as of Jan 25, 2026
-
-MAJOR DEVELOPMENTS (Late 2025 - January 2026):
-- PMK (Anbumani faction) joined NDA - January 7, 2026
-- AMMK (TTV Dhinakaran) rejoined NDA - January 22-23, 2026
-- KA Sengottaiyan (ex-AIADMK) joined TVK - November 2025
-- PM Modi rally at Madurantakam - January 23, 2026 (unified NDA front, EPS as CM candidate)
-- NDA consolidation gaining momentum
-- DMDK still undecided despite NDA efforts
-
-TOP VOTER CONCERNS:
-1. Women Safety (27.3%)
-2. Liquor & Drug Menace (21.8%)
-3. Unemployment (17.6%)
-4. Corruption (14.2%)
-5. Language/Cultural Identity (9.5%)
-6. Inflation (6.4%)
-
-KEY DYNAMICS:
-- Tamil Nadu historically alternates DMK and AIADMK
-- NDA consolidation (PMK + AMMK) strengthens opposition front
-- Anti-incumbency vs welfare schemes
-- Four-way split: DMK+ vs NDA vs TVK vs NTK
-- TVK as wildcard for splitting anti-incumbency votes
-
-PARTY PERFORMANCE CONTEXT:
-- NTK (Seeman): Historically gets 3-6% statewide, strong social media presence but limited ground impact
-- TVK (Vijay): New entrant with massive star power, KA Sengottaiyan brings AIADMK cadre influence
-- PMK: Vanniyar base (6-8% statewide), now part of NDA (Anbumani faction)
-- AMMK: AIADMK splinter votes now consolidated back to NDA
-- DMK+ vs AIADMK+ (NDA): Primary contest for power, NDA stronger with consolidations
-"""
-
-# V3 March 2026 context — pre-election baseline.
-# NOTE: This is a structural baseline. Grok's x_search will fill in the
-# fast-moving developments (candidate names, rallies, latest sentiment).
-_V3_MARCH_2026_CONTEXT = """
-================================================================================
-CONTEXT V3 — MARCH 2026 (PRE-ELECTION — SUPPLEMENT WITH X SEARCH)
-================================================================================
-ELECTION IMMINENT:
-- Tamil Nadu Assembly election due April-May 2026 (assembly term ends May 10, 2026)
-- Campaign period now active — candidates being finalised and announced
-- This is the most critical window; ground-level developments are fast-moving
-
-ALLIANCE STATUS (March 2026 — CONFIRMED):
-- DMK+ (SPA): Now 14 partners — DMDK (Premallatha Vijayakant) officially joined March 2026
-  Core: DMK + INC + VCK + CPI + CPM + MDMK + IUML + MNM + DMDK + others
-  CM candidate: MK Stalin
-- AIADMK+ (NDA): AIADMK + BJP + PMK (Anbumani) + AMMK (TTV Dhinakaran) — EPS as CM candidate
-- TVK (Vijay): Standalone — finalising candidate list across 234 constituencies
-- NTK (Seeman): Standalone — contesting all 234 seats
-- DMDK joining DMK+ is significant: DMDK has a strong cadre base in several
-  western and central TN constituencies — factor this into those seats
-
-CAMPAIGN DYNAMICS:
-- All alliances in active campaign mode, rallies happening statewide
-- Candidate announcements ongoing — first-time data available for many seats
-- Final voter sentiment forming — x_search findings are most valuable at this stage
-- Ground-level issues (local MLA performance, caste dynamics) now decisive
-
-IMPORTANT: The above March 2026 context is a structural baseline only.
-Use your x_search results to update with the very latest — candidate names,
-recent rallies, local controversies, and current ground sentiment are
-especially critical this close to the election.
-"""
-
-
-def load_v3_combined_trends(trends_file_path: str) -> str:
-    """
-    Build the combined political context for V3 predictions.
-
-    Includes all three layers so Grok can reason about the full trajectory:
-      - V1 (November 2025): Original compiled trends from file
-      - V2 (January 2026):  Hardcoded context fed to V2 predictions
-      - V3 (March 2026):    Pre-election baseline + instruction to use x_search
-
-    The V1 file content is included in full so nothing from the original
-    research compilation is lost. V2 and V3 are appended as dated sections.
-    """
-    with open(trends_file_path, "r") as f:
-        v1_context = f.read().strip()
-
-    v1_section = f"""================================================================================
-CONTEXT V1 — NOVEMBER 2025 (Original Research Compilation)
-================================================================================
-{v1_context}
-"""
-
-    return v1_section + _V2_JANUARY_2026_CONTEXT + _V3_MARCH_2026_CONTEXT
-
-
-# ── Version detection ────────────────────────────────────────────────────────
-
-def get_next_version(db: Session, year: int) -> int:
-    """Return the version number to use for this run."""
+def get_current_version(db: Session, year: int) -> int:
     max_version = db.query(func.max(Prediction.version)).filter(
         Prediction.predicted_year == year
     ).scalar()
@@ -371,100 +328,130 @@ def get_next_version(db: Session, year: int) -> int:
     return max_version + 1 if count >= 234 else max_version
 
 
-# ── Prompt builder ───────────────────────────────────────────────────────────
+# ── Grok call ────────────────────────────────────────────────────────────────
 
-def build_grok_prompt(
-    constituency_data: dict,
+def generate_prediction_grok(
+    client: Client,
+    constituency_id: int,
+    db: Session,
     alliance_config: dict,
     trends_summary: str,
-    previous_prediction: dict | None,
-) -> str:
-    """
-    Wrap the existing build_prediction_prompt() with:
-      1. An X Search instruction prefix so Grok knows to search before reasoning.
-      2. A stricter JSON-only output instruction suffix for reasoning models.
+    model: str,
+) -> dict | None:
+    constituency_data = fetch_constituency_historical_data(
+        constituency_id=constituency_id,
+        db=db,
+        alliance_mapping=alliance_config["party_mapping"],
+    )
+    if not constituency_data:
+        return None
 
-    The base prompt body is unchanged so the expected JSON schema stays the same.
-    """
-    const = constituency_data["constituency"]
+    previous_prediction = fetch_previous_prediction(constituency_id, db)
 
-    x_search_prefix = f"""STEP 1 — RESEARCH (do this first using x_search):
-Search X for ground-level information about this specific constituency before predicting.
-Run these searches:
-1. "{const['name']} election 2026"
-2. "{const['name']} candidate 2026"
-3. "{const['district']} Tamil Nadu politics 2026"
-4. "{const['name']} MLA"
-
-What to look for: candidate announcements, recent rallies, local MLA performance,
-caste-level dynamics, voter sentiment, any local controversies.
-
-STEP 2 — ANALYSE AND PREDICT (using everything below + your x_search findings):
-Weight your x_search findings alongside the historical data. If x_search surfaces
-a strong local candidate, a recent controversy, or a significant shift in sentiment
-for this constituency, let that influence your prediction — especially for
-confidence_level, win_probability, and key_factors.
-
----
-
-"""
-
-    base_prompt = build_prediction_prompt(
+    prompt = build_grok_prompt(
         constituency_data=constituency_data,
         alliance_config=alliance_config,
         trends_summary=trends_summary,
         previous_prediction=previous_prediction,
     )
 
-    # Replace the TASK "Consider" bullet list to explicitly include x_search findings.
-    # This ensures the base prompt's task section references what was researched above.
-    base_prompt = base_prompt.replace(
-        "- Four-way contest dynamics",
-        "- Four-way contest dynamics\n- Your x_search findings about this specific constituency (candidate names, local sentiment, recent rallies)",
+    chat = client.chat.create(
+        model=model,
+        tools=[x_search()],
+        max_tokens=4000,
     )
+    chat.append(user(prompt))
 
-    # Strict JSON-only output instruction for reasoning models.
-    strict_suffix = """
+    print(f"\n    [DEBUG] Calling chat.sample()...")
+    response = chat.sample()
+    print(f"    [DEBUG] Response type: {type(response)}")
+    print(f"    [DEBUG] Response attrs: {[a for a in dir(response) if not a.startswith('_')]}")
 
-CRITICAL OUTPUT RULE:
-Your entire response must be ONLY the raw JSON object — no markdown, no code fences,
-no preamble, no explanation, no trailing text.
-Begin your response with { and end with }. Nothing else.
-"""
+    content = response.content
+    reasoning = response.reasoning_content if hasattr(response, "reasoning_content") else ""
 
-    return x_search_prefix + base_prompt + strict_suffix
+    print(f"    [DEBUG] content length: {len(content or '')}")
+    print(f"    [DEBUG] reasoning length: {len(reasoning or '')}")
+    print(f"    [DEBUG] content preview: {(content or '')[:200]}")
+
+    if not content:
+        content = reasoning
+
+    prediction_data = extract_json_from_response(content)
+    if prediction_data is None:
+        print(f"    Parse error. Raw response (first 300): {(content or '')[:300]}")
+        return None
+
+    ok, reason = validate_and_normalise(prediction_data)
+    if not ok:
+        print(f"    Validation error: {reason}")
+        return None
+
+    const = constituency_data["constituency"]
+    prediction_data["constituency_id"]  = constituency_id
+    prediction_data["predicted_year"]   = YEAR
+    prediction_data["prediction_model"] = f"Grok ({model})"
+    prediction_data["extra_data"]       = {
+        "alliance_config_version":     "2026_v3",
+        "trends_date":                 "2026-03",
+        "historical_data_years":       [2021, 2016, 2011],
+        "previous_prediction_version": 2,
+        "x_search_enabled":            True,
+    }
+
+    return prediction_data
 
 
-# ── --submit ─────────────────────────────────────────────────────────────────
+# ── Main ─────────────────────────────────────────────────────────────────────
 
-def cmd_submit(args):
+def main():
+    parser = argparse.ArgumentParser(
+        description="V3 predictions — Grok + X Search"
+    )
+    parser.add_argument("--model",  default=DEFAULT_MODEL)
+    parser.add_argument("--limit",  type=int, default=None)
+    parser.add_argument("--constituency-ids", type=str, default=None)
+    parser.add_argument("--delay",  type=int, default=2, help="Seconds between calls")
+    parser.add_argument("--delete-version", type=int, default=None)
+    args = parser.parse_args()
+
     if not settings.XAI_API_KEY:
         print("ERROR: XAI_API_KEY not set in server/.env")
         sys.exit(1)
 
-    alliance_config = load_alliance_config(ALLIANCE_CONFIG)
-    trends_summary  = load_v3_combined_trends(TRENDS_FILE)
-    db     = SessionLocal()
-    client = Client(api_key=settings.XAI_API_KEY)
+    db = SessionLocal()
 
     try:
-        version = get_next_version(db, YEAR)
-        print(f"Prediction version : {version}")
+        if args.delete_version:
+            count = db.query(Prediction).filter(
+                Prediction.predicted_year == YEAR,
+                Prediction.version == args.delete_version,
+            ).delete()
+            db.commit()
+            print(f"Deleted {count} predictions for version {args.delete_version}")
+            return
+
+        alliance_config = load_alliance_config(ALLIANCE_CONFIG)
+        trends_summary  = load_v3_combined_trends()
+        client          = Client(api_key=settings.XAI_API_KEY)
+
+        version = get_current_version(db, YEAR)
+
+        existing_count = db.query(func.count(Prediction.id)).filter(
+            Prediction.predicted_year == YEAR,
+            Prediction.version == version,
+        ).scalar()
+
+        print("=" * 70)
+        print("V3 PREDICTION GENERATION — GROK + X SEARCH")
+        print("=" * 70)
         print(f"Model              : {args.model}")
+        print(f"Prediction version : {version}")
+        print(f"Already completed  : {existing_count}/234")
         print()
 
-        # Guard against re-submitting the same version
-        if os.path.exists(BATCH_STATE_FILE):
-            with open(BATCH_STATE_FILE) as f:
-                saved_state = json.load(f)
-            if saved_state.get("version") == version:
-                print(f"Batch already submitted for version {version}.")
-                print(f"Batch ID : {saved_state['batch_id']}")
-                print("Use --status or --collect to proceed.")
-                return
-
-        # Constituencies not yet predicted for this version
-        done_ids = {
+        # Build constituency list
+        existing_ids = {
             row[0]
             for row in db.query(Prediction.constituency_id).filter(
                 Prediction.predicted_year == YEAR,
@@ -472,385 +459,107 @@ def cmd_submit(args):
             ).all()
         }
 
-        all_constituencies = (
-            db.query(Constituency).order_by(Constituency.ac_number).all()
-        )
-        to_process = [c for c in all_constituencies if c.id not in done_ids]
+        if args.constituency_ids:
+            ids = [int(x.strip()) for x in args.constituency_ids.split(",")]
+            constituencies = (
+                db.query(Constituency)
+                .filter(Constituency.id.in_(ids), ~Constituency.id.in_(existing_ids))
+                .order_by(Constituency.ac_number)
+                .all()
+            )
+        else:
+            q = db.query(Constituency).filter(
+                ~Constituency.id.in_(existing_ids)
+            ).order_by(Constituency.ac_number)
+            if args.limit:
+                q = q.limit(args.limit)
+            constituencies = q.all()
 
-        if args.limit:
-            to_process = to_process[: args.limit]
-
-        print(f"Total constituencies : 234")
-        print(f"Already done         : {len(done_ids)}")
-        print(f"To submit            : {len(to_process)}")
+        total = len(constituencies)
+        print(f"To process : {total}")
         print()
 
-        if not to_process:
-            print("All constituencies already have predictions for this version.")
+        if total == 0:
+            print("Nothing to process.")
             return
 
-        confirm = input(
-            f"Submit {len(to_process)} requests to Grok batch (version {version})? (yes/no): "
-        )
+        confirm = input(f"Proceed with {total} constituencies? (yes/no): ")
         if confirm.lower() != "yes":
             print("Aborted.")
             return
 
-        # Create batch
-        batch = client.batch.create(
-            batch_name=f"votelytics_v{version}_predictions_{YEAR}"
-        )
-        batch_id = batch.batch_id
-        print(f"\nBatch created : {batch_id}")
-        print("Building prompts...")
-
-        batch_requests   = []
-        constituency_map = {}   # batch_request_id → constituency_id (saved in state file)
-        skipped          = []
-
-        for i, constituency in enumerate(to_process):
-            constituency_data = fetch_constituency_historical_data(
-                constituency_id=constituency.id,
-                db=db,
-                alliance_mapping=alliance_config["party_mapping"],
-            )
-            if not constituency_data:
-                skipped.append(constituency.name)
-                continue
-
-            previous_prediction = fetch_previous_prediction(constituency.id, db)
-
-            prompt = build_grok_prompt(
-                constituency_data=constituency_data,
-                alliance_config=alliance_config,
-                trends_summary=trends_summary,
-                previous_prediction=previous_prediction,
-            )
-
-            batch_request_id = f"constituency_{constituency.id}"
-
-            chat = client.chat.create(
-                model=args.model,
-                batch_request_id=batch_request_id,
-                tools=[x_search()],
-                max_tokens=2000,
-            )
-            chat.append(user(prompt))
-            batch_requests.append(chat)
-            constituency_map[batch_request_id] = constituency.id
-
-            if (i + 1) % 50 == 0:
-                print(f"  Built {i + 1}/{len(to_process)} prompts...")
-
-        if not batch_requests:
-            print("No valid requests to submit.")
-            return
-
-        # Submit all at once
-        print(f"\nSubmitting {len(batch_requests)} requests...")
-        client.batch.add(batch_id=batch_id, batch_requests=batch_requests)
-        print("Submitted successfully.\n")
-
-        if skipped:
-            print(f"Skipped (no historical data): {skipped}\n")
-
-        # Persist state so --status and --collect can find the batch
-        state = {
-            "batch_id":         batch_id,
-            "version":          version,
-            "year":             YEAR,
-            "model":            args.model,
-            "submitted_at":     datetime.now().isoformat(),
-            "total_requests":   len(batch_requests),
-            "constituency_map": constituency_map,
-        }
-        os.makedirs(os.path.dirname(BATCH_STATE_FILE), exist_ok=True)
-        with open(BATCH_STATE_FILE, "w") as f:
-            json.dump(state, f, indent=2)
-
-        print(f"Batch state saved : {BATCH_STATE_FILE}")
         print()
-        print("Next steps:")
-        print("  Check progress : poetry run python scripts/v3_batch_predictions.py --status")
-        print("  Collect results: poetry run python scripts/v3_batch_predictions.py --collect")
 
-    finally:
-        db.close()
+        successful  = 0
+        failed      = 0
+        failed_list = []
+        start_time  = datetime.now()
 
+        for idx, constituency in enumerate(constituencies, 1):
+            print(f"[{idx}/{total}] {constituency.name} (AC #{constituency.ac_number}) — {constituency.district}")
+            print(f"    Calling Grok...", end=" ", flush=True)
 
-# ── --status ──────────────────────────────────────────────────────────────────
-
-def cmd_status(args):
-    if not os.path.exists(BATCH_STATE_FILE):
-        print("No batch state found. Run --submit first.")
-        return
-
-    with open(BATCH_STATE_FILE) as f:
-        state = json.load(f)
-
-    if not settings.XAI_API_KEY:
-        print("ERROR: XAI_API_KEY not set in server/.env")
-        sys.exit(1)
-
-    client = Client(api_key=settings.XAI_API_KEY)
-    batch  = client.batch.get(batch_id=state["batch_id"])
-    s      = batch.state
-
-    done  = s.num_success + s.num_error
-    total = s.num_requests
-    pct   = (done / total * 100) if total else 0
-
-    print(f"Batch ID    : {state['batch_id']}")
-    print(f"Version     : {state['version']}")
-    print(f"Model       : {state['model']}")
-    print(f"Submitted   : {state['submitted_at']}")
-    print()
-    print(f"Progress    : {done}/{total}  ({pct:.1f}%)")
-    print(f"  Pending   : {s.num_pending}")
-    print(f"  Success   : {s.num_success}")
-    print(f"  Failed    : {s.num_error}")
-    print(f"  Cancelled : {s.num_cancelled}")
-
-    if s.num_pending == 0:
-        print("\nBatch complete! Run --collect to save to DB.")
-        try:
-            cost = batch.cost_breakdown.total_cost_usd_ticks / 1e10
-            print(f"Total cost  : ${cost:.4f}")
-        except Exception:
-            pass
-
-
-# ── --collect ─────────────────────────────────────────────────────────────────
-
-def cmd_collect(args):
-    if not os.path.exists(BATCH_STATE_FILE):
-        print("No batch state found. Run --submit first.")
-        return
-
-    with open(BATCH_STATE_FILE) as f:
-        state = json.load(f)
-
-    if not settings.XAI_API_KEY:
-        print("ERROR: XAI_API_KEY not set in server/.env")
-        sys.exit(1)
-
-    client   = Client(api_key=settings.XAI_API_KEY)
-    db       = SessionLocal()
-    batch_id = state["batch_id"]
-    version  = state["version"]
-    # constituency_map: "constituency_123" → 123
-    constituency_map: dict[str, int] = state["constituency_map"]
-
-    try:
-        # Optionally wait until all requests finish
-        if args.wait:
-            print("Waiting for batch to complete (polling every 60s)...")
-            while True:
-                batch  = client.batch.get(batch_id=batch_id)
-                s      = batch.state
-                done   = s.num_success + s.num_error
-                print(
-                    f"\r  {done}/{s.num_requests} done  ({s.num_pending} pending)  ",
-                    end="",
-                    flush=True,
+            try:
+                prediction_data = generate_prediction_grok(
+                    client=client,
+                    constituency_id=constituency.id,
+                    db=db,
+                    alliance_config=alliance_config,
+                    trends_summary=trends_summary,
+                    model=args.model,
                 )
-                if s.num_pending == 0:
-                    print("\nBatch complete!")
-                    break
-                time.sleep(60)
-        else:
-            batch = client.batch.get(batch_id=batch_id)
-            if batch.state.num_pending > 0:
-                print(
-                    f"Batch still processing: {batch.state.num_pending} requests pending.\n"
-                    "Run --collect --wait to block until done, or try again later."
-                )
-                return
-
-        # Paginate through all results
-        print(f"\nCollecting results from batch {batch_id}...")
-        all_succeeded = []
-        all_failed    = []
-        pagination_token = None
-
-        while True:
-            page = client.batch.list_batch_results(
-                batch_id=batch_id,
-                limit=100,
-                pagination_token=pagination_token,
-            )
-            all_succeeded.extend(page.succeeded)
-            all_failed.extend(page.failed)
-            pagination_token = page.pagination_token
-            if pagination_token is None:
-                break
-
-        print(f"Retrieved : {len(all_succeeded)} succeeded, {len(all_failed)} failed\n")
-
-        # Process each successful result
-        saved        = 0
-        parse_errors = []
-        save_errors  = []
-
-        for result in all_succeeded:
-            bid              = result.batch_request_id
-            constituency_id  = constituency_map.get(bid)
-
-            if constituency_id is None:
-                print(f"  WARNING: unknown batch_request_id '{bid}' — skipping")
+            except Exception as e:
+                print(f"ERROR: {e}")
+                failed += 1
+                failed_list.append({"id": constituency.id, "name": constituency.name, "reason": str(e)})
+                print()
+                if idx < total:
+                    time.sleep(args.delay)
                 continue
 
-            # Idempotent: skip if already saved (safe to re-run --collect)
-            already_saved = db.query(Prediction).filter(
-                Prediction.constituency_id == constituency_id,
-                Prediction.predicted_year  == YEAR,
-                Prediction.version         == version,
-            ).first()
-            if already_saved:
-                continue
+            if prediction_data:
+                print("OK")
+                print(f"    Winner    : {prediction_data['predicted_winner_alliance']} ({prediction_data['predicted_winner_party']})")
+                print(f"    Confidence: {prediction_data['confidence_level']} ({float(prediction_data['win_probability']):.0%})")
+                print(f"    Vote share: {prediction_data['predicted_vote_share']:.1f}%  Margin: {prediction_data['predicted_margin_pct']:.1f}%")
 
-            # ── Extract JSON ──────────────────────────────────────────────
-            content         = result.response.content
-            prediction_data = extract_json_from_response(content)
-
-            if prediction_data is None:
-                parse_errors.append({
-                    "batch_request_id": bid,
-                    "constituency_id":  constituency_id,
-                    "reason":           "JSON extraction failed",
-                    "content_preview":  (content or "")[:300],
-                })
-                continue
-
-            # ── Validate & normalise ──────────────────────────────────────
-            ok, reason = validate_and_normalise(prediction_data)
-            if not ok:
-                parse_errors.append({
-                    "batch_request_id": bid,
-                    "constituency_id":  constituency_id,
-                    "reason":           reason,
-                    "content_preview":  (content or "")[:300],
-                })
-                continue
-
-            # ── Add metadata (mirrors generate_predictions.py exactly) ────
-            prediction_data["constituency_id"]  = constituency_id
-            prediction_data["predicted_year"]   = YEAR
-            prediction_data["prediction_model"] = f"Grok ({state['model']})"
-            prediction_data["extra_data"]       = {
-                "alliance_config_version":      "2026_v3",
-                "trends_date":                  "2026-03",
-                "historical_data_years":        [2021, 2016, 2011],
-                "previous_prediction_version":  version - 1,
-                "x_search_enabled":             True,
-                "batch_id":                     batch_id,
-            }
-
-            # ── Save to DB ────────────────────────────────────────────────
-            if save_prediction(db, prediction_data, version):
-                saved += 1
-                if saved % 20 == 0:
-                    print(f"  Saved {saved} predictions...")
+                if save_prediction(db, prediction_data, version):
+                    print(f"    Saved (version {version})")
+                    successful += 1
+                else:
+                    failed += 1
+                    failed_list.append({"id": constituency.id, "name": constituency.name, "reason": "DB save failed"})
             else:
-                save_errors.append({
-                    "batch_request_id": bid,
-                    "constituency_id":  constituency_id,
-                })
+                print("FAILED")
+                failed += 1
+                failed_list.append({"id": constituency.id, "name": constituency.name, "reason": "No prediction returned"})
 
-        # ── Summary ───────────────────────────────────────────────────────
+            print()
+
+            if idx < total:
+                time.sleep(args.delay)
+
+        duration = datetime.now() - start_time
+
+        print("=" * 70)
+        print("SUMMARY")
+        print("=" * 70)
+        print(f"Version     : {version}")
+        print(f"Successful  : {successful}/{total}")
+        print(f"Failed      : {failed}")
+        print(f"Time taken  : {duration}")
+
+        if failed_list:
+            failed_ids = ",".join(str(f["id"]) for f in failed_list)
+            print()
+            print("Retry failures:")
+            print(f"  poetry run python scripts/v3_batch_predictions.py --constituency-ids {failed_ids}")
+
         print()
-        print("=" * 60)
-        print("COLLECTION SUMMARY")
-        print("=" * 60)
-        print(f"Version         : {version}")
-        print(f"Batch successes : {len(all_succeeded)}")
-        print(f"Batch failures  : {len(all_failed)}")
-        print(f"Saved to DB     : {saved}")
-        print(f"Parse errors    : {len(parse_errors)}")
-        print(f"DB save errors  : {len(save_errors)}")
-
-        # Cost
-        try:
-            batch  = client.batch.get(batch_id=batch_id)
-            cost   = batch.cost_breakdown.total_cost_usd_ticks / 1e10
-            print(f"Total cost      : ${cost:.4f}")
-        except Exception:
-            pass
-
-        # Save error report for investigation / retry
-        if parse_errors or save_errors or all_failed:
-            errors = {
-                "parse_errors": parse_errors,
-                "save_errors":  save_errors,
-                "batch_failures": [
-                    {"batch_request_id": r.batch_request_id, "error": r.error_message}
-                    for r in all_failed
-                ],
-            }
-            error_file = BATCH_STATE_FILE.replace(".json", "_errors.json")
-            with open(error_file, "w") as f:
-                json.dump(errors, f, indent=2)
-            print(f"\nError details   : {error_file}")
-
-            # Convenience retry command using the existing sequential script
-            retry_ids = list({
-                str(constituency_map.get(r.batch_request_id))
-                for r in all_failed
-                if constituency_map.get(r.batch_request_id)
-            } | {
-                str(e["constituency_id"])
-                for e in parse_errors
-            })
-            if retry_ids:
-                print("\nRetry failures via sequential script:")
-                print(
-                    f"  poetry run python scripts/generate_predictions.py "
-                    f"--constituency-ids {','.join(retry_ids)}"
-                )
-
-        print("\nDone!")
+        print("Done!")
 
     finally:
         db.close()
-
-
-# ── Entry point ───────────────────────────────────────────────────────────────
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="V3 batch predictions — Grok + X Search"
-    )
-
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--submit",  action="store_true", help="Submit batch to Grok")
-    group.add_argument("--status",  action="store_true", help="Check batch progress")
-    group.add_argument("--collect", action="store_true", help="Save results to DB")
-
-    parser.add_argument(
-        "--model",
-        default=DEFAULT_MODEL,
-        help=f"Grok model (default: {DEFAULT_MODEL})",
-    )
-    parser.add_argument(
-        "--limit",
-        type=int,
-        default=None,
-        help="Only submit first N constituencies (for test runs)",
-    )
-    parser.add_argument(
-        "--wait",
-        action="store_true",
-        help="With --collect: poll until batch finishes before collecting",
-    )
-
-    args = parser.parse_args()
-
-    if args.submit:
-        cmd_submit(args)
-    elif args.status:
-        cmd_status(args)
-    elif args.collect:
-        cmd_collect(args)
 
 
 if __name__ == "__main__":

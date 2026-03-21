@@ -20,6 +20,7 @@ function ConstituencyDetail() {
   const [constituency, setConstituency] = useState<Constituency | null>(null);
   const [prediction, setPrediction] = useState<PredictionDetail | null>(null);
   const [previousPrediction, setPreviousPrediction] = useState<PredictionDetail | null>(null);
+  const [v1Prediction, setV1Prediction] = useState<PredictionDetail | null>(null);
   const [results2021, setResults2021] = useState<ElectionResult[]>([]);
   const [results2016, setResults2016] = useState<ElectionResult[]>([]);
   const [results2011, setResults2011] = useState<ElectionResult[]>([]);
@@ -87,10 +88,19 @@ function ConstituencyDetail() {
         const predictionData = await predictionsAPI.getByConstituency(constituencyData.id, 2026, true);
         setPrediction(predictionData.prediction);
         setPreviousPrediction(predictionData.previous_prediction || null);
+
+        // Fetch V1 separately for 3-point trend chart
+        try {
+          const v1Data = await predictionsAPI.getByConstituency(constituencyData.id, 2026, false, 1);
+          setV1Prediction(v1Data.prediction || null);
+        } catch {
+          setV1Prediction(null);
+        }
       } catch (predErr) {
         console.log('No prediction found for this constituency');
         setPrediction(null);
         setPreviousPrediction(null);
+        setV1Prediction(null);
       }
 
     } catch (err) {
@@ -196,6 +206,7 @@ function ConstituencyDetail() {
           <PredictionSection
             prediction={prediction}
             previousPrediction={previousPrediction}
+            v1Prediction={v1Prediction}
           />
         )}
 

@@ -18,6 +18,7 @@ import type { PredictionDetail } from '../../types/prediction';
 interface PredictionSectionProps {
   prediction: PredictionDetail;
   previousPrediction?: PredictionDetail | null;
+  v1Prediction?: PredictionDetail | null;
 }
 
 /**
@@ -34,7 +35,7 @@ const getAllianceColor = (alliance: string): string => {
   return '#808080'; // Gray for others
 };
 
-function PredictionSection({ prediction, previousPrediction }: PredictionSectionProps) {
+function PredictionSection({ prediction, previousPrediction, v1Prediction }: PredictionSectionProps) {
   const allianceColor = getAllianceColor(prediction.predicted_winner_alliance);
 
   // Handle key_factors - can be string (old data) or array (new data)
@@ -131,39 +132,32 @@ function PredictionSection({ prediction, previousPrediction }: PredictionSection
                 Vote Share Trend
               </h3>
               {(() => {
-                // Build chart data from predictions
+                // Build chart data from all 3 versions
                 const allAlliances = new Set<string>();
                 topAlliances.forEach((a) => allAlliances.add(a.alliance));
                 previousPrediction?.top_alliances?.forEach((a) => allAlliances.add(a.alliance));
+                v1Prediction?.top_alliances?.forEach((a) => allAlliances.add(a.alliance));
 
-                // Helper to format date as "Mon YYYY"
-                const formatDate = (dateStr: string) => {
-                  const date = new Date(dateStr);
-                  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-                };
-
-                // Create data points for each version
                 const chartData: Array<{ version: string; [key: string]: number | string }> = [];
 
-                // Add v1 data point if available
-                if (previousPrediction?.top_alliances) {
-                  const v1Data: { version: string; [key: string]: number | string } = {
-                    version: formatDate(previousPrediction.created_at),
-                  };
-                  previousPrediction.top_alliances.forEach((a) => {
-                    v1Data[a.alliance] = a.vote_share;
-                  });
-                  chartData.push(v1Data);
+                // V1 — November 2025
+                if (v1Prediction?.top_alliances) {
+                  const pt: { version: string; [key: string]: number | string } = { version: 'V1 — Nov 2025' };
+                  v1Prediction.top_alliances.forEach((a) => { pt[a.alliance] = a.vote_share; });
+                  chartData.push(pt);
                 }
 
-                // Add current version data point
-                const currentData: { version: string; [key: string]: number | string } = {
-                  version: formatDate(prediction.created_at),
-                };
-                topAlliances.forEach((a) => {
-                  currentData[a.alliance] = a.vote_share;
-                });
-                chartData.push(currentData);
+                // V2 — January 2026
+                if (previousPrediction?.top_alliances) {
+                  const pt: { version: string; [key: string]: number | string } = { version: 'V2 — Jan 2026' };
+                  previousPrediction.top_alliances.forEach((a) => { pt[a.alliance] = a.vote_share; });
+                  chartData.push(pt);
+                }
+
+                // V3 — March 2026 (current)
+                const pt: { version: string; [key: string]: number | string } = { version: 'V3 — Mar 2026' };
+                topAlliances.forEach((a) => { pt[a.alliance] = a.vote_share; });
+                chartData.push(pt);
 
                 // Get alliance list sorted by current vote share
                 const allianceList = Array.from(allAlliances).sort((a, b) => {
@@ -213,13 +207,13 @@ function PredictionSection({ prediction, previousPrediction }: PredictionSection
                       </LineChart>
                     </ResponsiveContainer>
 
-                    {/* Trend Summary below chart */}
-                    {previousPrediction && (
+                    {/* Trend Summary below chart — V1 vs V3 */}
+                    {v1Prediction && (
                       <div className="mt-4 pt-4 border-t border-gray-100">
                         <div className="flex flex-wrap gap-4 justify-center">
                           {allianceList.map((alliance) => {
                             const current = topAlliances.find((a) => a.alliance === alliance)?.vote_share;
-                            const prev = previousPrediction.top_alliances?.find((a) => a.alliance === alliance)?.vote_share;
+                            const prev = v1Prediction.top_alliances?.find((a) => a.alliance === alliance)?.vote_share;
                             if (current === undefined || prev === undefined) return null;
                             const change = current - prev;
                             if (Math.abs(change) < 0.1) return null;
