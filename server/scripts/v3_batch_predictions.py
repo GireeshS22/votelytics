@@ -54,7 +54,7 @@ from app.services.prediction_generator import (
 # ── Constants ────────────────────────────────────────────────────────────────
 
 YEAR = 2026
-DEFAULT_MODEL = "grok-4-fast-reasoning"
+DEFAULT_MODEL = "grok-4.20-0309-reasoning"
 
 _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BATCH_STATE_FILE   = os.path.join(_BASE, "data", "batch_state_v3.json")
@@ -241,6 +241,117 @@ def save_prediction(db: Session, prediction_data: dict, version: int) -> bool:
         return False
 
 
+# ── V3 combined trends ────────────────────────────────────────────────────────
+
+# V2 January 2026 context — exactly what was fed to V2 predictions.
+# Kept here as a literal constant so V3 always has V2's baseline for comparison.
+_V2_JANUARY_2026_CONTEXT = """
+================================================================================
+CONTEXT V2 — JANUARY 2026
+================================================================================
+GOVERNMENT: DMK incumbent (2021-2026) facing mixed performance
+- Criticized for law & order failures and corruption allegations
+- Strong on welfare schemes (women's assistance, free bus rides, breakfast schemes)
+- Clean sweep in 2024 Lok Sabha (39/39 seats) provides momentum
+- Significant anti-incumbency sentiment detected
+
+ALLIANCES (January 2026):
+- DMK-led Secular Progressive Alliance (SPA) - 13 partners, largely intact
+- AIADMK-BJP NDA alliance - CONSOLIDATED with PMK (Anbumani) and AMMK joining
+- TVK (Actor Vijay) - standalone, KA Sengottaiyan joined as chief coordinator (Nov 2025)
+- NTK (Seeman) - standalone, contesting all 234 seats
+- DMDK - undecided as of Jan 25, 2026
+
+MAJOR DEVELOPMENTS (Late 2025 - January 2026):
+- PMK (Anbumani faction) joined NDA - January 7, 2026
+- AMMK (TTV Dhinakaran) rejoined NDA - January 22-23, 2026
+- KA Sengottaiyan (ex-AIADMK) joined TVK - November 2025
+- PM Modi rally at Madurantakam - January 23, 2026 (unified NDA front, EPS as CM candidate)
+- NDA consolidation gaining momentum
+- DMDK still undecided despite NDA efforts
+
+TOP VOTER CONCERNS:
+1. Women Safety (27.3%)
+2. Liquor & Drug Menace (21.8%)
+3. Unemployment (17.6%)
+4. Corruption (14.2%)
+5. Language/Cultural Identity (9.5%)
+6. Inflation (6.4%)
+
+KEY DYNAMICS:
+- Tamil Nadu historically alternates DMK and AIADMK
+- NDA consolidation (PMK + AMMK) strengthens opposition front
+- Anti-incumbency vs welfare schemes
+- Four-way split: DMK+ vs NDA vs TVK vs NTK
+- TVK as wildcard for splitting anti-incumbency votes
+
+PARTY PERFORMANCE CONTEXT:
+- NTK (Seeman): Historically gets 3-6% statewide, strong social media presence but limited ground impact
+- TVK (Vijay): New entrant with massive star power, KA Sengottaiyan brings AIADMK cadre influence
+- PMK: Vanniyar base (6-8% statewide), now part of NDA (Anbumani faction)
+- AMMK: AIADMK splinter votes now consolidated back to NDA
+- DMK+ vs AIADMK+ (NDA): Primary contest for power, NDA stronger with consolidations
+"""
+
+# V3 March 2026 context — pre-election baseline.
+# NOTE: This is a structural baseline. Grok's x_search will fill in the
+# fast-moving developments (candidate names, rallies, latest sentiment).
+_V3_MARCH_2026_CONTEXT = """
+================================================================================
+CONTEXT V3 — MARCH 2026 (PRE-ELECTION — SUPPLEMENT WITH X SEARCH)
+================================================================================
+ELECTION IMMINENT:
+- Tamil Nadu Assembly election due April-May 2026 (assembly term ends May 10, 2026)
+- Campaign period now active — candidates being finalised and announced
+- This is the most critical window; ground-level developments are fast-moving
+
+ALLIANCE STATUS (March 2026 — CONFIRMED):
+- DMK+ (SPA): Now 14 partners — DMDK (Premallatha Vijayakant) officially joined March 2026
+  Core: DMK + INC + VCK + CPI + CPM + MDMK + IUML + MNM + DMDK + others
+  CM candidate: MK Stalin
+- AIADMK+ (NDA): AIADMK + BJP + PMK (Anbumani) + AMMK (TTV Dhinakaran) — EPS as CM candidate
+- TVK (Vijay): Standalone — finalising candidate list across 234 constituencies
+- NTK (Seeman): Standalone — contesting all 234 seats
+- DMDK joining DMK+ is significant: DMDK has a strong cadre base in several
+  western and central TN constituencies — factor this into those seats
+
+CAMPAIGN DYNAMICS:
+- All alliances in active campaign mode, rallies happening statewide
+- Candidate announcements ongoing — first-time data available for many seats
+- Final voter sentiment forming — x_search findings are most valuable at this stage
+- Ground-level issues (local MLA performance, caste dynamics) now decisive
+
+IMPORTANT: The above March 2026 context is a structural baseline only.
+Use your x_search results to update with the very latest — candidate names,
+recent rallies, local controversies, and current ground sentiment are
+especially critical this close to the election.
+"""
+
+
+def load_v3_combined_trends(trends_file_path: str) -> str:
+    """
+    Build the combined political context for V3 predictions.
+
+    Includes all three layers so Grok can reason about the full trajectory:
+      - V1 (November 2025): Original compiled trends from file
+      - V2 (January 2026):  Hardcoded context fed to V2 predictions
+      - V3 (March 2026):    Pre-election baseline + instruction to use x_search
+
+    The V1 file content is included in full so nothing from the original
+    research compilation is lost. V2 and V3 are appended as dated sections.
+    """
+    with open(trends_file_path, "r") as f:
+        v1_context = f.read().strip()
+
+    v1_section = f"""================================================================================
+CONTEXT V1 — NOVEMBER 2025 (Original Research Compilation)
+================================================================================
+{v1_context}
+"""
+
+    return v1_section + _V2_JANUARY_2026_CONTEXT + _V3_MARCH_2026_CONTEXT
+
+
 # ── Version detection ────────────────────────────────────────────────────────
 
 def get_next_version(db: Session, year: int) -> int:
@@ -277,12 +388,22 @@ def build_grok_prompt(
     """
     const = constituency_data["constituency"]
 
-    x_search_prefix = f"""Before analysing, use x_search to find recent ground-level information. Search for:
+    x_search_prefix = f"""STEP 1 — RESEARCH (do this first using x_search):
+Search X for ground-level information about this specific constituency before predicting.
+Run these searches:
 1. "{const['name']} election 2026"
 2. "{const['name']} candidate 2026"
 3. "{const['district']} Tamil Nadu politics 2026"
+4. "{const['name']} MLA"
 
-Incorporate any candidate announcements, rally reports, local controversies, or voter sentiment you find into your prediction.
+What to look for: candidate announcements, recent rallies, local MLA performance,
+caste-level dynamics, voter sentiment, any local controversies.
+
+STEP 2 — ANALYSE AND PREDICT (using everything below + your x_search findings):
+Weight your x_search findings alongside the historical data. If x_search surfaces
+a strong local candidate, a recent controversy, or a significant shift in sentiment
+for this constituency, let that influence your prediction — especially for
+confidence_level, win_probability, and key_factors.
 
 ---
 
@@ -295,8 +416,14 @@ Incorporate any candidate announcements, rally reports, local controversies, or 
         previous_prediction=previous_prediction,
     )
 
-    # Reasoning models may include a summary after the JSON.
-    # This suffix overrides the base prompt's closing instruction.
+    # Replace the TASK "Consider" bullet list to explicitly include x_search findings.
+    # This ensures the base prompt's task section references what was researched above.
+    base_prompt = base_prompt.replace(
+        "- Four-way contest dynamics",
+        "- Four-way contest dynamics\n- Your x_search findings about this specific constituency (candidate names, local sentiment, recent rallies)",
+    )
+
+    # Strict JSON-only output instruction for reasoning models.
     strict_suffix = """
 
 CRITICAL OUTPUT RULE:
@@ -316,7 +443,7 @@ def cmd_submit(args):
         sys.exit(1)
 
     alliance_config = load_alliance_config(ALLIANCE_CONFIG)
-    trends_summary  = load_trends_summary(TRENDS_FILE)
+    trends_summary  = load_v3_combined_trends(TRENDS_FILE)
     db     = SessionLocal()
     client = Client(api_key=settings.XAI_API_KEY)
 

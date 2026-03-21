@@ -1,0 +1,206 @@
+{
+  "alliances": {
+    "DMK+": {
+      "lead_party": "DMK",
+      "full_name": "DMK-led Secular Progressive Alliance",
+      "cm_candidate": "M. K. Stalin",
+      "partners": [
+        {
+          "party": "DMK",
+          "full_name": "Dravida Munnetra Kazhagam",
+          "leader": "M. K. Stalin"
+        },
+        {
+          "party": "INC",
+          "full_name": "Indian National Congress",
+          "leader": "K. Selvaperunthagai"
+        },
+        {
+          "party": "VCK",
+          "full_name": "Viduthalai Chiruthaigal Katchi",
+          "leader": "Thol. Thirumavalavan"
+        },
+        {
+          "party": "CPI",
+          "full_name": "Communist Party of India",
+          "leader": "P. Shanmugam / M. Veerapandian"
+        },
+        {
+          "party": "CPM",
+          "full_name": "Communist Party of India (Marxist)",
+          "leader": "M. Veerapandian"
+        },
+        {
+          "party": "MDMK",
+          "full_name": "Marumalarchi Dravida Munnetra Kazhagam",
+          "leader": "Vaiko"
+        },
+        {
+          "party": "IUML",
+          "full_name": "Indian Union Muslim League",
+          "leader": "K. M. Kader Mohideen"
+        },
+        {
+          "party": "KMDK",
+          "full_name": "Kongunadu Makkal Desia Katchi",
+          "leader": "E. R. Eswaran"
+        },
+        {
+          "party": "MMK",
+          "full_name": "Manithaneya Makkal Katchi",
+          "leader": "M. H. Jawahirullah"
+        },
+        {
+          "party": "TVK",
+          "full_name": "Tamizhaga Vazhvurimai Katchi",
+          "leader": "T. Velmurugan"
+        },
+        {
+          "party": "ATP",
+          "full_name": "Adhi Tamilar Peravai",
+          "leader": "R. Athiyaman"
+        },
+        {
+          "party": "MVK",
+          "full_name": "Makkal Viduthalai Katchi",
+          "leader": "S. K. Murugavel Rajan"
+        },
+        {
+          "party": "MNM",
+          "full_name": "Makkal Needhi Maiam",
+          "leader": "Kamal Haasan"
+        },
+        {
+          "party": "DMDK",
+          "full_name": "Desiya Murpokku Dravida Kazhagam",
+          "leader": "Premallatha Vijayakant",
+          "joined": "March 2026"
+        }
+      ]
+    },
+    "AIADMK+": {
+      "lead_party": "AIADMK",
+      "full_name": "AIADMK-led NDA Alliance",
+      "cm_candidate": "Edappadi K. Palaniswami",
+      "partners": [
+        {
+          "party": "AIADMK",
+          "full_name": "All India Anna Dravida Munnetra Kazhagam",
+          "leader": "Edappadi K. Palaniswami"
+        },
+        {
+          "party": "BJP",
+          "full_name": "Bharatiya Janata Party",
+          "leader": "Nainar Nagenthran"
+        },
+        {
+          "party": "PMK",
+          "full_name": "Pattali Makkal Katchi",
+          "leader": "Anbumani Ramadoss",
+          "joined": "January 7, 2026"
+        },
+        {
+          "party": "AMMK",
+          "full_name": "Amma Makkal Munnettra Kazagam",
+          "leader": "T. T. V. Dhinakaran",
+          "joined": "January 22-23, 2026"
+        },
+        {
+          "party": "TMC(M)",
+          "full_name": "Tamil Maanila Congress (Moopanar)",
+          "leader": "G. K. Vasan"
+        },
+        {
+          "party": "IJK",
+          "full_name": "Indhiya Jananayaga Katchi",
+          "leader": "T. R. Paarivendhar"
+        },
+        {
+          "party": "PBK",
+          "full_name": "Puratchi Bharatham Katchi",
+          "leader": "M. Jagan Moorthy"
+        },
+        {
+          "party": "PNK",
+          "full_name": "Puthiya Needhi Katchi",
+          "leader": "A. C. Shanmugam"
+        }
+      ],
+      "status": "Consolidated NDA - PM Modi rally Jan 23, 2026"
+    },
+    "NTK": {
+      "lead_party": "NTK",
+      "full_name": "Naam Tamilar Katchi",
+      "cm_candidate": "Seeman",
+      "partners": [
+        {
+          "party": "NTK",
+          "full_name": "Naam Tamilar Katchi",
+          "leader": "Seeman"
+        }
+      ],
+      "status": "Standalone - Contesting all 234 seats"
+    },
+    "TVK": {
+      "lead_party": "TVK",
+      "full_name": "Tamilaga Vettri Kazhagam",
+      "cm_candidate": "Vijay",
+      "partners": [
+        {
+          "party": "TVK",
+          "full_name": "Tamilaga Vettri Kazhagam",
+          "leader": "Vijay"
+        }
+      ],
+      "status": "Standalone - KA Sengottaiyan joined as chief coordinator (Nov 2025)"
+    },
+    "DMDK": {
+      "lead_party": "DMDK",
+      "full_name": "Desiya Murpokku Dravida Kazhagam",
+      "cm_candidate": "Premallatha Vijayakant",
+      "partners": [
+        {
+          "party": "DMDK",
+          "full_name": "Desiya Murpokku Dravida Kazhagam",
+          "leader": "Premallatha Vijayakant"
+        }
+      ],
+      "status": "Joined DMK+ alliance - March 2026"
+    }
+  },
+  "party_mapping": {
+    "DMK": "DMK+",
+    "INC": "DMK+",
+    "VCK": "DMK+",
+    "CPI": "DMK+",
+    "CPM": "DMK+",
+    "MDMK": "DMK+",
+    "IUML": "DMK+",
+    "KMDK": "DMK+",
+    "MMK": "DMK+",
+    "TVK": "DMK+",
+    "ATP": "DMK+",
+    "MVK": "DMK+",
+    "MNM": "DMK+",
+    "AIADMK": "AIADMK+",
+    "BJP": "AIADMK+",
+    "TMC(M)": "AIADMK+",
+    "IJK": "AIADMK+",
+    "PBK": "AIADMK+",
+    "PNK": "AIADMK+",
+    "NTK": "NTK",
+    "Vijay TVK": "TVK",
+    "PMK": "AIADMK+",
+    "AMMK": "AIADMK+",
+    "DMDK": "DMK+"
+  },
+  "notes": {
+    "dmk_alliance": "14 partners - DMDK (Premallatha Vijayakant) joined March 2026, adding to INC, VCK, CPI, MDMK base",
+    "aiadmk_alliance": "8 partners - consolidated NDA with PMK (Jan 7) and AMMK (Jan 22-23) joining",
+    "four_way_contest": "Primary contest between DMK+, AIADMK+ (NDA), TVK (Vijay), and NTK (Seeman)",
+    "tvk_status": "Standalone with KA Sengottaiyan as chief coordinator bringing AIADMK cadre influence",
+    "dmdk_status": "Joined DMK+ alliance March 2026 - significant cadre base in western/central TN",
+    "nda_momentum": "PM Modi rally Jan 23 at Madurantakam projected unified NDA front with EPS as CM candidate",
+    "updated": "March 21, 2026"
+  }
+}
