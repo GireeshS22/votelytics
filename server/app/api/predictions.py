@@ -234,14 +234,21 @@ async def get_all_predictions(
 
 def format_prediction_response(prediction: Prediction, constituency: Constituency) -> dict:
     """Helper to format a prediction into API response format"""
-    # Get alliance from extra_data
-    alliance = prediction.extra_data.get('predicted_winner_alliance') if prediction.extra_data else prediction.predicted_winner_party
-    top_alliances = prediction.extra_data.get('top_alliances', []) if prediction.extra_data else []
+    extra = prediction.extra_data or {}
+
+    # Alliance — prefer extra_data for v3+
+    alliance = extra.get('predicted_winner_alliance') or prediction.predicted_winner_party
+
+    # top_alliances — V4 stores in top_candidates column with full candidate info
+    # V3 and earlier store in extra_data.top_alliances
+    if prediction.top_candidates:
+        top_alliances = prediction.top_candidates  # V4: [{alliance, party, candidate, vote_share}]
+    else:
+        top_alliances = extra.get('top_alliances', [])  # V1-V3 fallback
 
     # Reclassify confidence based on relaxed thresholds
     reclassified_confidence = reclassify_confidence_level(prediction.win_probability, prediction.predicted_margin_pct)
 
-    # If toss-up, show as "Toss-up" instead of alliance
     if reclassified_confidence.lower() == 'toss-up':
         alliance = 'Toss-up'
         party = 'Toss-up'
@@ -262,6 +269,7 @@ def format_prediction_response(prediction: Prediction, constituency: Constituenc
         },
         "predicted_winner_alliance": alliance,
         "predicted_winner_party": party,
+        "predicted_winner_name": prediction.predicted_winner_name,
         "confidence_level": reclassified_confidence,
         "win_probability": prediction.win_probability,
         "predicted_vote_share": prediction.predicted_vote_share,
@@ -269,6 +277,8 @@ def format_prediction_response(prediction: Prediction, constituency: Constituenc
         "top_alliances": top_alliances,
         "swing_from_last_election": prediction.swing_from_last_election,
         "key_factors": prediction.key_factors,
+        "candidate_factor": extra.get('candidate_factor'),
+        "visualization_tags": extra.get('visualization_tags', []),
         "version": prediction.version,
         "created_at": prediction.created_at.isoformat()
     }

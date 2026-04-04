@@ -6,6 +6,7 @@ import re
 
 from app.database import get_db
 from app.models.constituency import Constituency
+from app.models.candidate import Candidate
 from app.schemas.constituency import (
     ConstituencyResponse,
     ConstituencyList,
@@ -148,3 +149,53 @@ def get_constituencies_by_district(district: str, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail="No constituencies found in this district")
 
     return constituencies
+
+
+@router.get("/{constituency_id}/infographic")
+def get_constituency_infographic(constituency_id: int, db: Session = Depends(get_db)):
+    """
+    Get infographic URL for a constituency.
+    Returns the Supabase Storage public URL if generated, else 404.
+    """
+    constituency = db.query(Constituency).filter(Constituency.id == constituency_id).first()
+    if not constituency:
+        raise HTTPException(status_code=404, detail="Constituency not found")
+
+    url = (constituency.extra_data or {}).get("infographic_url")
+    if not url:
+        raise HTTPException(status_code=404, detail="Infographic not yet generated")
+
+    return {"url": url, "slug": constituency.slug}
+
+
+@router.get("/{constituency_id}/candidates")
+def get_constituency_candidates(
+    constituency_id: int,
+    election_year: int = Query(default=2026),
+    db: Session = Depends(get_db)
+):
+    """
+    Get 2026 candidates for a constituency (SPA, NDA, TVK, NTK)
+    """
+    candidates = (
+        db.query(Candidate)
+        .filter(
+            Candidate.constituency_id == constituency_id,
+            Candidate.extra_data["election_year"].as_integer() == election_year,
+        )
+        .all()
+    )
+
+    return {
+        "constituency_id": constituency_id,
+        "election_year": election_year,
+        "candidates": [
+            {
+                "id":       c.id,
+                "name":     c.name,
+                "party":    c.party,
+                "alliance": c.alliance,
+            }
+            for c in candidates
+        ],
+    }

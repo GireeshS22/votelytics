@@ -12,7 +12,7 @@ import { getConstituencySEO, SEO_CONFIG } from '../utils/seoConfig';
 import { generateConstituencySchema, generateBreadcrumbSchema, generatePredictionEventSchema } from '../utils/structuredData';
 import type { Constituency } from '../types/constituency';
 import type { ElectionResult } from '../types/election';
-import type { PredictionDetail } from '../types/prediction';
+import type { PredictionDetail, Candidate2026 } from '../types/prediction';
 
 function ConstituencyDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -24,6 +24,7 @@ function ConstituencyDetail() {
   const [results2021, setResults2021] = useState<ElectionResult[]>([]);
   const [results2016, setResults2016] = useState<ElectionResult[]>([]);
   const [results2011, setResults2011] = useState<ElectionResult[]>([]);
+  const [candidates, setCandidates] = useState<Candidate2026[]>([]);
   const [allConstituencies, setAllConstituencies] = useState<Constituency[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +66,14 @@ function ConstituencyDetail() {
       const allResults = await electionsAPI.getConstituencyHistory(constituencyData.id);
 
       setConstituency(constituencyData);
+
+      // Fetch 2026 candidates
+      try {
+        const candidatesData = await constituenciesAPI.getCandidates(constituencyData.id);
+        setCandidates(candidatesData);
+      } catch {
+        setCandidates([]);
+      }
 
       // Group results by year and sort by rank
       const results2021Data = allResults
@@ -207,6 +216,7 @@ function ConstituencyDetail() {
             prediction={prediction}
             previousPrediction={previousPrediction}
             v1Prediction={v1Prediction}
+            candidates={candidates}
           />
         )}
 

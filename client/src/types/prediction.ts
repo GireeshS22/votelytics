@@ -30,14 +30,26 @@ export interface PredictionDetail extends Prediction {
     urban_pct: number | null;
     literacy_rate: number | null;
   };
+  predicted_winner_name: string | null;
   top_alliances: AllianceVoteShare[];
   swing_from_last_election: number;
+  candidate_factor: 'positive' | 'neutral' | 'negative' | null;
+  visualization_tags: string[];
 }
 
 export interface AllianceVoteShare {
   alliance: string;
-  lead_party: string;
+  lead_party?: string;
+  party?: string;
+  candidate?: string;
   vote_share: number;
+}
+
+export interface Candidate2026 {
+  id: number;
+  name: string;
+  party: string;
+  alliance: string;
 }
 
 export interface AllianceDistribution {
