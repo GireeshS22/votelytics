@@ -399,7 +399,7 @@ export default function PredictionArticle() {
                     outerRadius={120}
                     paddingAngle={2}
                     dataKey="value"
-                    label={({ name, value }: { name: string; value: number }) => `${name} ${value.toFixed(1)}%`}
+                    label={({ name, value }: any) => `${name} ${(value as number).toFixed(1)}%`}
                   >
                     {voteDonut.map((entry) => (
                       <Cell key={entry.name} fill={allianceColor(entry.name)} />
