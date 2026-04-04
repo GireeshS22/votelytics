@@ -11,7 +11,8 @@ import type {
   PredictionComparison,
   PredictionFilters,
   PredictionsListResponse,
-  ConstituencyPredictionResponse
+  ConstituencyPredictionResponse,
+  Candidate2026
 } from '../types/prediction';
 import { getCached, setCached, CACHE_KEYS, CACHE_TTL } from '../utils/cache';
 
@@ -121,6 +122,31 @@ export const constituenciesAPI = {
   getByDistrict: async (district: string): Promise<Constituency[]> => {
     const response = await apiClient.get<Constituency[]>(`/constituency/district/${district}`);
     return response.data;
+  },
+
+  /**
+   * Get 2026 candidates for a constituency
+   */
+  getCandidates: async (constituencyId: number, electionYear = 2026): Promise<Candidate2026[]> => {
+    const response = await apiClient.get<{ candidates: Candidate2026[] }>(
+      `/constituency/${constituencyId}/candidates`,
+      { params: { election_year: electionYear } }
+    );
+    return response.data.candidates;
+  },
+
+  /**
+   * Get infographic URL for a constituency
+   */
+  getInfographicUrl: async (constituencyId: number): Promise<string | null> => {
+    try {
+      const response = await apiClient.get<{ url: string }>(
+        `/constituency/${constituencyId}/infographic`
+      );
+      return response.data.url;
+    } catch {
+      return null;
+    }
   },
 };
 
@@ -379,6 +405,26 @@ export const predictionsAPI = {
 
     console.log('🌐 Fetching regional summary from API...');
     const response = await apiClient.get<RegionalSummary>('/predictions/regional-summary', {
+      params: { year }
+    });
+
+    setCached(cacheKey, response.data, CACHE_TTL.ONE_HOUR);
+    return response.data;
+  },
+
+  /**
+   * Get aggregated article data for the prediction analysis page
+   */
+  getArticleData: async (year: number = 2026): Promise<any> => {
+    const cacheKey = `predictions_article_${year}`;
+    const cached = getCached<any>(cacheKey);
+    if (cached) {
+      console.log('✅ Article data loaded from cache');
+      return cached;
+    }
+
+    console.log('🌐 Fetching article data from API...');
+    const response = await apiClient.get('/predictions/article-data', {
       params: { year }
     });
 

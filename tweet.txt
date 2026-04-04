@@ -1,17 +1,39 @@
-We're launching VOTELYTICS ⚡
+🚨 VOTELYTICS V2 Predictions are LIVE! 🚨
 
-An open-source deep analytics project powered by AI to predict the outcome of the TN 2026 elections at constituency level.
+We've re-run our AI-powered election predictions for TN 2026 after major political developments in January 2026.
 
-Features:
-✅ Interactive constituency maps (234 ACs)
-✅ Historical analysis (2011-2021)
-✅ AI-powered swing predictions
-✅ Party bastion identification
-✅ Mobile-optimized dashboard
+🔑 Key Events That Changed Everything:
+• PMK (Anbumani Ramadoss) joins NDA (Jan 7)
+• AMMK (TTV Dhinakaran) rejoins NDA (Jan 22-23)
+• NDA consolidation rally with PM Modi
 
-🔮 Our first election prediction drops this weekend.
+📊 V1 vs V2 - What Changed?
 
-Visit: https://votelytics.in
-Feedback welcome 🙏
+V1 (Nov 2025): DMK+ was leading
+V2 (Jan 2026): NDA takes the lead 🔄
 
-#TamilNadu #Elections2026 #AI #OpenSource #DataScience #MachineLearning #ElectionPrediction #BuildInPublic #Votelytics
+🗳️ Updated Seat Projections:
+🟡 AIADMK+ (NDA): 112 seats
+🔴 DMK+: 101 seats
+⚪ Toss-up: 21 seats
+(Majority: 117)
+
+🔀 49 constituencies flipped their predicted winner
+• 38 seats: DMK+ ➡️ AIADMK+
+• 11 seats: AIADMK+ ➡️ DMK+
+
+✨ New Feature: Vote Share Trend Chart
+Each constituency page now shows a line graph comparing V1 vs V2 predictions - see how alliance formations shifted the vote share for each party.
+
+💡 This is what happens when two major parties (PMK + AMMK) consolidate under one alliance. The anti-incumbency vote is no longer split.
+
+⚖️ Neither alliance crosses majority yet - it all depends on how those 21 toss-up seats break.
+
+🔗 Visit: https://votelytics.in
+Explore any constituency to see the V1 vs V2 trend
+
+💻 100% open source. 100% transparent methodology.
+
+🤔 What do you think - will NDA consolidation be enough to unseat DMK?
+
+#TamilNadu #Elections2026 #TNElections2026 #Votelytics #AI #OpenSource #ElectionPrediction #DMK #AIADMK #NDA #PMK #AMMK #BuildInPublic

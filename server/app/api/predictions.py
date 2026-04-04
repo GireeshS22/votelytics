@@ -11,6 +11,7 @@ from app.database import get_db
 from app.models.prediction import Prediction
 from app.models.constituency import Constituency
 from app.models.election import ElectionResult
+from app.models.candidate import Candidate
 
 router = APIRouter()
 
@@ -234,14 +235,22 @@ async def get_all_predictions(
 
 def format_prediction_response(prediction: Prediction, constituency: Constituency) -> dict:
     """Helper to format a prediction into API response format"""
-    # Get alliance from extra_data
-    alliance = prediction.extra_data.get('predicted_winner_alliance') if prediction.extra_data else prediction.predicted_winner_party
-    top_alliances = prediction.extra_data.get('top_alliances', []) if prediction.extra_data else []
+    extra = prediction.extra_data or {}
+
+    # Alliance — prefer extra_data for v3+
+    alliance = extra.get('predicted_winner_alliance') or prediction.predicted_winner_party
+
+    # top_alliances — V4 stores in top_candidates with {alliance, party, candidate, vote_share}
+    # V1-V3 stored top_candidates as {party, vote_share} (no alliance key) — use extra_data instead
+    top_candidates = prediction.top_candidates or []
+    if top_candidates and any('alliance' in item for item in top_candidates):
+        top_alliances = top_candidates  # V4: has proper alliance key
+    else:
+        top_alliances = extra.get('top_alliances', [])  # V1-V3: proper {alliance, vote_share} structure
 
     # Reclassify confidence based on relaxed thresholds
     reclassified_confidence = reclassify_confidence_level(prediction.win_probability, prediction.predicted_margin_pct)
 
-    # If toss-up, show as "Toss-up" instead of alliance
     if reclassified_confidence.lower() == 'toss-up':
         alliance = 'Toss-up'
         party = 'Toss-up'
@@ -262,6 +271,7 @@ def format_prediction_response(prediction: Prediction, constituency: Constituenc
         },
         "predicted_winner_alliance": alliance,
         "predicted_winner_party": party,
+        "predicted_winner_name": prediction.predicted_winner_name,
         "confidence_level": reclassified_confidence,
         "win_probability": prediction.win_probability,
         "predicted_vote_share": prediction.predicted_vote_share,
@@ -269,6 +279,8 @@ def format_prediction_response(prediction: Prediction, constituency: Constituenc
         "top_alliances": top_alliances,
         "swing_from_last_election": prediction.swing_from_last_election,
         "key_factors": prediction.key_factors,
+        "candidate_factor": extra.get('candidate_factor'),
+        "visualization_tags": extra.get('visualization_tags', []),
         "version": prediction.version,
         "created_at": prediction.created_at.isoformat()
     }
@@ -490,4 +502,218 @@ async def get_available_versions(
             for v in versions
         ],
         "latest_version": versions[0].version if versions else None
+    }
+
+
+@router.get("/article-data")
+async def get_article_data(
+    year: int = Query(default=2026),
+    db: Session = Depends(get_db)
+):
+    """
+    Aggregated data for the prediction analysis article page.
+    Returns everything needed in one call.
+    """
+    pred_version = get_latest_version(db, year)
+
+    # Load all predictions with constituency info
+    rows = (
+        db.query(Prediction, Constituency)
+        .join(Constituency, Prediction.constituency_id == Constituency.id)
+        .filter(Prediction.predicted_year == year, Prediction.version == pred_version)
+        .order_by(Constituency.ac_number)
+        .all()
+    )
+
+    if not rows:
+        raise HTTPException(status_code=404, detail="No predictions found")
+
+    # Load all candidates for this year
+    candidates = db.query(Candidate).filter(
+        Candidate.extra_data["election_year"].as_integer() == year
+    ).all()
+
+    # Build candidate map: constituency_id -> {alliance: {name, party}}
+    cand_map = {}
+    for c in candidates:
+        if c.constituency_id not in cand_map:
+            cand_map[c.constituency_id] = {}
+        cand_map[c.constituency_id][c.alliance] = {
+            "name": c.name, "party": c.party
+        }
+
+    def get_alliance(pred):
+        a = (pred.extra_data or {}).get('predicted_winner_alliance') or pred.predicted_winner_party
+        return a
+
+    def get_top_alliances(pred):
+        tc = pred.top_candidates or []
+        if tc and any('alliance' in item for item in tc):
+            return tc
+        extra = pred.extra_data or {}
+        return extra.get('top_alliances', [])
+
+    def reclassify(pred):
+        return reclassify_confidence_level(pred.win_probability, pred.predicted_margin_pct)
+
+    # ── Build per-constituency records ──
+    all_records = []
+    seat_counts = {}           # alliance -> {safe, likely, lean, tossup, total}
+    district_breakdown = {}    # district -> {alliance -> count}
+    alliance_vote_totals = {}  # alliance -> [vote_shares]
+    party_vote_totals = {}     # party -> [vote_shares]
+    tossup_seats = []
+    tvk_seats = []
+    bjp_seats = []
+
+    for pred, const in rows:
+        alliance = get_alliance(pred)
+        conf = reclassify(pred)
+        top_a = get_top_alliances(pred)
+        const_candidates = cand_map.get(pred.constituency_id, {})
+
+        record = {
+            "ac_number": const.ac_number,
+            "name": const.name,
+            "district": const.district,
+            "alliance": alliance,
+            "confidence": conf,
+            "win_probability": pred.win_probability,
+            "predicted_vote_share": pred.predicted_vote_share,
+            "predicted_margin_pct": pred.predicted_margin_pct,
+            "key_factors": pred.key_factors,
+            "top_alliances": top_a,
+            "candidates": const_candidates,
+        }
+        all_records.append(record)
+
+        # Seat counts
+        if alliance not in seat_counts:
+            seat_counts[alliance] = {"safe": 0, "likely": 0, "lean": 0, "tossup": 0, "total": 0}
+        seat_counts[alliance]["total"] += 1
+        seat_counts[alliance][conf.lower().replace("-", "")] += 1
+
+        # District breakdown
+        dist = const.district or "Unknown"
+        if dist not in district_breakdown:
+            district_breakdown[dist] = {}
+        district_breakdown[dist][alliance] = district_breakdown[dist].get(alliance, 0) + 1
+
+        # Alliance vote totals (from top_alliances)
+        for a in top_a:
+            aname = a.get("alliance") or a.get("party", "Unknown")
+            vs = a.get("vote_share", 0)
+            if aname not in alliance_vote_totals:
+                alliance_vote_totals[aname] = []
+            alliance_vote_totals[aname].append(vs)
+
+            # Party-level breakdown
+            party = a.get("party", aname)
+            if party not in party_vote_totals:
+                party_vote_totals[party] = {"vote_shares": [], "alliance": aname}
+            party_vote_totals[party]["vote_shares"].append(vs)
+
+        # Toss-up seats
+        if conf == "Toss-up":
+            tossup_seats.append(record)
+
+        # TVK data
+        tvk_entry = next((a for a in top_a if (a.get("alliance") or a.get("party", "")) == "TVK"), None)
+        if tvk_entry:
+            tvk_seats.append({
+                **record,
+                "tvk_vote_share": tvk_entry.get("vote_share", 0),
+            })
+
+        # BJP seats: where the NDA candidate's party is BJP
+        nda_cand = const_candidates.get("NDA", const_candidates.get("AIADMK+", {}))
+        if nda_cand and nda_cand.get("party") == "BJP":
+            bjp_seats.append(record)
+
+    # ── Compute aggregate stats ──
+
+    # Average vote share per alliance
+    avg_vote_shares = {}
+    for aname, shares in alliance_vote_totals.items():
+        avg_vote_shares[aname] = round(sum(shares) / len(shares), 2) if shares else 0
+
+    # Party-level averages
+    party_averages = {}
+    for party, data in party_vote_totals.items():
+        avg = round(sum(data["vote_shares"]) / len(data["vote_shares"]), 2) if data["vote_shares"] else 0
+        party_averages[party] = {"avg_vote_share": avg, "alliance": data["alliance"], "seats_contested": len(data["vote_shares"])}
+
+    # Top 10 TVK seats by vote share
+    tvk_top_10 = sorted(tvk_seats, key=lambda x: x["tvk_vote_share"], reverse=True)[:10]
+
+    # BJP vs INC and BJP vs DMK head-to-head
+    bjp_vs_inc = []
+    bjp_vs_dmk = []
+    for rec in all_records:
+        ta = rec["top_alliances"]
+        cands = rec["candidates"]
+        nda_cand = cands.get("NDA", cands.get("AIADMK+", {}))
+        spa_cand = cands.get("SPA", cands.get("DMK+", {}))
+        nda_party = nda_cand.get("party", "")
+        spa_party = spa_cand.get("party", "")
+
+        spa_share = next((a.get("vote_share", 0) for a in ta if (a.get("alliance") or a.get("party")) == "SPA"), 0)
+        nda_share = next((a.get("vote_share", 0) for a in ta if (a.get("alliance") or a.get("party")) == "NDA"), 0)
+
+        if nda_party == "BJP" and spa_party == "INC":
+            bjp_vs_inc.append({
+                "ac_number": rec["ac_number"], "name": rec["name"], "district": rec["district"],
+                "bjp_candidate": nda_cand.get("name"), "inc_candidate": spa_cand.get("name"),
+                "bjp_share": nda_share, "inc_share": spa_share,
+                "winner": rec["alliance"], "margin": rec["predicted_margin_pct"],
+            })
+        if nda_party == "BJP":
+            bjp_vs_dmk.append({
+                "ac_number": rec["ac_number"], "name": rec["name"], "district": rec["district"],
+                "bjp_candidate": nda_cand.get("name"), "dmk_candidate": spa_cand.get("name"),
+                "spa_party": spa_party,
+                "bjp_share": nda_share, "dmk_share": spa_share,
+                "winner": rec["alliance"], "margin": rec["predicted_margin_pct"],
+            })
+
+    # DMK vs AIADMK head-to-head margins
+    dmk_vs_admk = []
+    for rec in all_records:
+        ta = rec["top_alliances"]
+        spa_share = next((a.get("vote_share", 0) for a in ta if (a.get("alliance") or a.get("party")) == "SPA"), 0)
+        nda_share = next((a.get("vote_share", 0) for a in ta if (a.get("alliance") or a.get("party")) == "NDA"), 0)
+        dmk_vs_admk.append({
+            "ac_number": rec["ac_number"], "name": rec["name"], "district": rec["district"],
+            "dmk_share": spa_share, "admk_share": nda_share,
+            "diff": round(spa_share - nda_share, 2),
+            "winner": rec["alliance"], "confidence": rec["confidence"],
+        })
+
+    # Margin distribution buckets
+    margin_buckets = {"<2%": 0, "2-5%": 0, "5-10%": 0, "10-20%": 0, ">20%": 0}
+    for rec in all_records:
+        m = abs(rec["predicted_margin_pct"])
+        if m < 2: margin_buckets["<2%"] += 1
+        elif m < 5: margin_buckets["2-5%"] += 1
+        elif m < 10: margin_buckets["5-10%"] += 1
+        elif m < 20: margin_buckets["10-20%"] += 1
+        else: margin_buckets[">20%"] += 1
+
+    return {
+        "year": year,
+        "version": pred_version,
+        "total_seats": len(rows),
+        "generated_date": rows[0][0].created_at.isoformat() if rows else None,
+        "seat_counts": seat_counts,
+        "district_breakdown": district_breakdown,
+        "avg_vote_shares": avg_vote_shares,
+        "party_averages": party_averages,
+        "margin_buckets": margin_buckets,
+        "tossup_seats": tossup_seats,
+        "tvk_top_10": tvk_top_10,
+        "bjp_seats": bjp_seats,
+        "bjp_vs_inc": bjp_vs_inc,
+        "bjp_vs_dmk": bjp_vs_dmk,
+        "dmk_vs_admk": sorted(dmk_vs_admk, key=lambda x: x["diff"]),
+        "all_predictions": all_records,
     }
