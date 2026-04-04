@@ -137,10 +137,11 @@ export default function PredictionArticle() {
   const bjpVsDmk = data.bjp_vs_dmk as any[];
   const dmkVsAdmk = (data.dmk_vs_admk as any[]).map(s => ({ ...s, winner: norm(s.winner) }));
 
-  const dmkSeats = seatCounts['DMK+']?.total || 0;
-  const admkSeats = seatCounts['AIADMK+']?.total || 0;
-  const tvkTotal = seatCounts['TVK']?.total || 0;
-  const ntkTotal = seatCounts['NTK']?.total || 0;
+  // "Projected" = total minus toss-ups (matches /predictions page methodology)
+  const dmkSeats = (seatCounts['DMK+']?.total || 0) - (seatCounts['DMK+']?.tossup || 0);
+  const admkSeats = (seatCounts['AIADMK+']?.total || 0) - (seatCounts['AIADMK+']?.tossup || 0);
+  const tvkTotal = (seatCounts['TVK']?.total || 0) - (seatCounts['TVK']?.tossup || 0);
+  const ntkTotal = (seatCounts['NTK']?.total || 0) - (seatCounts['NTK']?.tossup || 0);
 
   /* ── Chart data builders ── */
 
@@ -424,7 +425,7 @@ export default function PredictionArticle() {
                       />
                       <div className="flex-1">
                         <div className="font-semibold text-gray-800">{a}</div>
-                        <div className="text-sm text-gray-500">{seatCounts[a]?.total || 0} seats predicted</div>
+                        <div className="text-sm text-gray-500">{(seatCounts[a]?.total || 0) - (seatCounts[a]?.tossup || 0)} seats projected</div>
                       </div>
                       <div className="text-2xl font-bold" style={{ color: allianceColor(a) }}>
                         {share.toFixed(1)}%
