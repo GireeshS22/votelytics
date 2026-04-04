@@ -399,7 +399,7 @@ export default function PredictionArticle() {
                     outerRadius={120}
                     paddingAngle={2}
                     dataKey="value"
-                    label={({ name, value }) => `${name} ${value.toFixed(1)}%`}
+                    label={({ name, value }: { name: string; value: number }) => `${name} ${value.toFixed(1)}%`}
                   >
                     {voteDonut.map((entry) => (
                       <Cell key={entry.name} fill={allianceColor(entry.name)} />
@@ -590,7 +590,7 @@ export default function PredictionArticle() {
                 <tbody>
                   {tossupSeats
                     .sort((a, b) => Math.abs(a.predicted_margin_pct) - Math.abs(b.predicted_margin_pct))
-                    .map((s, i) => (
+                    .map((s) => (
                     <tr key={s.ac_number} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="px-4 py-2.5 text-gray-400">{s.ac_number}</td>
                       <td className="px-4 py-2.5 font-medium text-gray-800">{s.name}</td>
