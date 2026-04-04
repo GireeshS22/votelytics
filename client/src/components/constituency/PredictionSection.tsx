@@ -19,6 +19,7 @@ interface PredictionSectionProps {
   prediction: PredictionDetail;
   previousPrediction?: PredictionDetail | null;
   v1Prediction?: PredictionDetail | null;
+  v2Prediction?: PredictionDetail | null;
   candidates?: Candidate2026[];
 }
 
@@ -26,6 +27,7 @@ interface PredictionSectionProps {
  * Get color for an alliance
  */
 const getAllianceColor = (alliance: string): string => {
+  if (!alliance) return '#9CA3AF';
   if (alliance === 'Toss-up') return '#9CA3AF'; // Gray for toss-ups
   if (alliance.includes('DMK') && !alliance.includes('AIADMK')) return getPartyColor('DMK');
   if (alliance.includes('AIADMK') || alliance.includes('ADMK')) return getPartyColor('AIADMK');
@@ -36,12 +38,12 @@ const getAllianceColor = (alliance: string): string => {
   return '#808080'; // Gray for others
 };
 
-// Alliance display config
+// Alliance display config (keys match the candidates API alliance field)
 const ALLIANCE_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  SPA:  { label: 'SPA (DMK Alliance)',   color: '#C41E3A', bg: '#FEE2E2' },
-  NDA:  { label: 'NDA (AIADMK Alliance)', color: '#FF6B00', bg: '#FFF3E0' },
-  TVK:  { label: 'TVK (Vijay)',           color: '#7C3AED', bg: '#EDE9FE' },
-  NTK:  { label: 'NTK (Seeman)',          color: '#065F46', bg: '#D1FAE5' },
+  SPA:  { label: 'DMK+',  color: '#C41E3A', bg: '#FEE2E2' },
+  NDA:  { label: 'AIADMK+', color: '#FF6B00', bg: '#FFF3E0' },
+  TVK:  { label: 'TVK (Vijay)',  color: '#7C3AED', bg: '#EDE9FE' },
+  NTK:  { label: 'NTK (Seeman)', color: '#065F46', bg: '#D1FAE5' },
 };
 
 const TAG_LABELS: Record<string, string> = {
@@ -82,15 +84,25 @@ const TAG_COLORS: Record<string, string> = {
   nda_consolidation:   'bg-orange-100 text-orange-800',
 };
 
-function PredictionSection({ prediction, previousPrediction, v1Prediction, candidates = [] }: PredictionSectionProps) {
-  const allianceColor = getAllianceColor(prediction.predicted_winner_alliance);
+// Normalize V4 alliance names (SPA→DMK+, NDA→AIADMK+) to keep display consistent
+const normalizeAllianceName = (a: string): string => {
+  if (a === 'SPA') return 'DMK+';
+  if (a === 'NDA') return 'AIADMK+';
+  return a;
+};
 
-  // Handle key_factors - can be string (old data) or array (new data)
-  const keyFactors = Array.isArray(prediction.key_factors)
+function PredictionSection({ prediction, previousPrediction, v1Prediction, v2Prediction, candidates = [] }: PredictionSectionProps) {
+  const displayAlliance = normalizeAllianceName(prediction.predicted_winner_alliance);
+  const allianceColor = getAllianceColor(displayAlliance);
+
+  // Handle key_factors - array (old data) or long string (V4)
+  const keyFactors: string[] = Array.isArray(prediction.key_factors)
     ? prediction.key_factors
     : typeof prediction.key_factors === 'string' && prediction.key_factors
-    ? prediction.key_factors.split('.').map((f: string) => f.trim()).filter((f: string) => f)
+    ? prediction.key_factors.split('\n').map((f: string) => f.trim()).filter((f: string) => f)
     : [];
+  // If still a single unsplit block (no \n), keep as one item
+  const isLongParagraph = keyFactors.length === 1 && keyFactors[0].length > 200;
 
   // Get top alliances for vote distribution
   const topAlliances = prediction.top_alliances || [];
@@ -144,7 +156,7 @@ function PredictionSection({ prediction, previousPrediction, v1Prediction, candi
                 <span className="text-xs text-gray-600 font-medium">🎯 Predicted Winner</span>
                 <div className="flex flex-col">
                   <span className="text-base font-bold text-gray-900">
-                    {prediction.predicted_winner_alliance}
+                    {displayAlliance}
                   </span>
                   {prediction.predicted_winner_name && (
                     <span className="text-sm text-gray-600 font-medium">
@@ -227,6 +239,7 @@ function PredictionSection({ prediction, previousPrediction, v1Prediction, candi
                   const cfg = ALLIANCE_CONFIG[alliance];
                   const cand = candidateMap[alliance];
                   const isWinner = prediction.predicted_winner_alliance === alliance;
+                  const voteShare = topAlliances.find((a) => a.alliance === alliance)?.vote_share;
                   return (
                     <div
                       key={alliance}
@@ -241,7 +254,7 @@ function PredictionSection({ prediction, previousPrediction, v1Prediction, candi
                           className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
                           style={{ backgroundColor: cfg?.color || '#6B7280' }}
                         >
-                          {alliance}
+                          {cfg?.label || alliance}
                         </span>
                         {isWinner && <span className="text-xs">🏆</span>}
                       </div>
@@ -249,6 +262,11 @@ function PredictionSection({ prediction, previousPrediction, v1Prediction, candi
                         <>
                           <p className="text-sm font-semibold text-gray-900 mt-1 leading-tight">{cand.name}</p>
                           <p className="text-xs text-gray-500 mt-0.5">{cand.party}</p>
+                          {voteShare !== undefined && (
+                            <p className="text-xs font-semibold mt-1" style={{ color: cfg?.color || '#6B7280' }}>
+                              {voteShare.toFixed(1)}%
+                            </p>
+                          )}
                         </>
                       ) : (
                         <p className="text-sm text-gray-400 mt-1">TBD</p>
@@ -268,38 +286,53 @@ function PredictionSection({ prediction, previousPrediction, v1Prediction, candi
                 Vote Share Trend
               </h3>
               {(() => {
-                // Build chart data from all 3 versions
+                // Normalize V4 alliance names (SPA→DMK+, NDA→AIADMK+) to keep display consistent
+                const normalizeAlliance = (a: string) => {
+                  if (!a) return a;
+                  if (a === 'SPA' || a === 'DMK Alliance') return 'DMK+';
+                  if (a === 'NDA' || a === 'AIADMK Alliance' || a === 'NDA Alliance') return 'AIADMK+';
+                  return a;
+                };
+
+                // Build chart data from all 4 versions
                 const allAlliances = new Set<string>();
-                topAlliances.forEach((a) => allAlliances.add(a.alliance));
-                previousPrediction?.top_alliances?.forEach((a) => allAlliances.add(a.alliance));
-                v1Prediction?.top_alliances?.forEach((a) => allAlliances.add(a.alliance));
+                topAlliances.forEach((a) => a.alliance && allAlliances.add(normalizeAlliance(a.alliance)));
+                previousPrediction?.top_alliances?.forEach((a) => a.alliance && allAlliances.add(normalizeAlliance(a.alliance)));
+                v2Prediction?.top_alliances?.forEach((a) => a.alliance && allAlliances.add(normalizeAlliance(a.alliance)));
+                v1Prediction?.top_alliances?.forEach((a) => a.alliance && allAlliances.add(normalizeAlliance(a.alliance)));
 
                 const chartData: Array<{ version: string; [key: string]: number | string }> = [];
 
                 // V1 — November 2025
-                if (v1Prediction?.top_alliances) {
+                if (v1Prediction?.top_alliances?.length) {
                   const pt: { version: string; [key: string]: number | string } = { version: 'V1 — Nov 2025' };
-                  v1Prediction.top_alliances.forEach((a) => { pt[a.alliance] = a.vote_share; });
+                  v1Prediction.top_alliances.forEach((a) => { if (a.alliance) pt[normalizeAlliance(a.alliance)] = a.vote_share; });
                   chartData.push(pt);
                 }
 
                 // V2 — January 2026
-                if (previousPrediction?.top_alliances) {
+                if (v2Prediction?.top_alliances?.length) {
                   const pt: { version: string; [key: string]: number | string } = { version: 'V2 — Jan 2026' };
-                  previousPrediction.top_alliances.forEach((a) => { pt[a.alliance] = a.vote_share; });
+                  v2Prediction.top_alliances.forEach((a) => { if (a.alliance) pt[normalizeAlliance(a.alliance)] = a.vote_share; });
                   chartData.push(pt);
                 }
 
-                // Latest version label
-                const versionLabel = prediction.version >= 4 ? 'V4 — Apr 2026' : 'V3 — Mar 2026';
-                const pt: { version: string; [key: string]: number | string } = { version: versionLabel };
-                topAlliances.forEach((a) => { pt[a.alliance] = a.vote_share; });
+                // V3 — March 2026 (previousPrediction when V4 is latest)
+                if (previousPrediction?.top_alliances?.length) {
+                  const pt: { version: string; [key: string]: number | string } = { version: 'V3 — Mar 2026' };
+                  previousPrediction.top_alliances.forEach((a) => { if (a.alliance) pt[normalizeAlliance(a.alliance)] = a.vote_share; });
+                  chartData.push(pt);
+                }
+
+                // V4 — April 2026 (current)
+                const pt: { version: string; [key: string]: number | string } = { version: 'V4 — Apr 2026' };
+                topAlliances.forEach((a) => { if (a.alliance) pt[normalizeAlliance(a.alliance)] = a.vote_share; });
                 chartData.push(pt);
 
-                // Get alliance list sorted by current vote share
+                // Get alliance list sorted by current vote share (using normalized names)
                 const allianceList = Array.from(allAlliances).sort((a, b) => {
-                  const aShare = topAlliances.find((x) => x.alliance === a)?.vote_share || 0;
-                  const bShare = topAlliances.find((x) => x.alliance === b)?.vote_share || 0;
+                  const aShare = topAlliances.find((x) => normalizeAlliance(x.alliance) === a)?.vote_share || 0;
+                  const bShare = topAlliances.find((x) => normalizeAlliance(x.alliance) === b)?.vote_share || 0;
                   return bShare - aShare;
                 });
 
@@ -350,13 +383,13 @@ function PredictionSection({ prediction, previousPrediction, v1Prediction, candi
                       </LineChart>
                     </ResponsiveContainer>
 
-                    {/* Trend Summary below chart — V1 vs V3 */}
+                    {/* Trend Summary below chart — V1 vs V4 */}
                     {v1Prediction && (
                       <div className="mt-4 pt-4 border-t border-gray-100">
                         <div className="flex flex-wrap gap-4 justify-center">
                           {allianceList.map((alliance) => {
-                            const current = topAlliances.find((a) => a.alliance === alliance)?.vote_share;
-                            const prev = v1Prediction.top_alliances?.find((a) => a.alliance === alliance)?.vote_share;
+                            const current = topAlliances.find((a) => normalizeAlliance(a.alliance) === alliance)?.vote_share;
+                            const prev = v1Prediction.top_alliances?.find((a) => normalizeAlliance(a.alliance) === alliance)?.vote_share;
                             if (current === undefined || prev === undefined) return null;
                             const change = current - prev;
                             if (Math.abs(change) < 0.1) return null;
@@ -394,55 +427,18 @@ function PredictionSection({ prediction, previousPrediction, v1Prediction, candi
                 <span>💡</span>
                 Key Prediction Factors
               </h3>
-              <ul className="space-y-3">
-                {keyFactors.map((factor, idx) => (
-                  <li key={idx} className="flex items-start gap-3">
-                    <span className="text-blue-500 mt-1.5 flex-shrink-0">•</span>
-                    <span className="text-gray-700 leading-relaxed">{factor.trim()}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Infographic Share Section */}
-          {infographicUrl && (
-            <div className="mt-6 bg-gray-50 rounded-xl p-4 border border-gray-100">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <span>📤</span> Share Infographic
-              </h3>
-              <div className="flex gap-3 flex-wrap items-start">
-                {/* Preview */}
-                <a href={infographicUrl} target="_blank" rel="noreferrer" className="flex-shrink-0">
-                  <img
-                    src={infographicUrl}
-                    alt="Constituency infographic"
-                    className="w-24 h-24 rounded-lg object-cover shadow border border-gray-200 hover:shadow-md transition-shadow"
-                  />
-                </a>
-                {/* Buttons */}
-                <div className="flex flex-col gap-2 flex-1">
-                  <p className="text-xs text-gray-500">1080×1080 PNG — ready for WhatsApp, Instagram & Twitter</p>
-                  <div className="flex gap-2 flex-wrap">
-                    <button
-                      onClick={handleDownload}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      ⬇ Download PNG
-                    </button>
-                    <button
-                      onClick={handleCopyLink}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                        copied
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
-                    >
-                      {copied ? '✓ Copied!' : '🔗 Copy Link'}
-                    </button>
-                  </div>
-                </div>
-              </div>
+              {isLongParagraph ? (
+                <p className="text-gray-700 leading-relaxed text-sm">{keyFactors[0]}</p>
+              ) : (
+                <ul className="space-y-3">
+                  {keyFactors.map((factor, idx) => (
+                    <li key={idx} className="flex items-start gap-3">
+                      <span className="text-blue-500 mt-1.5 flex-shrink-0">•</span>
+                      <span className="text-gray-700 leading-relaxed text-sm">{factor}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 

@@ -14,6 +14,12 @@ import type { PredictionsSummary, Prediction } from '../types/prediction';
 /**
  * Get color for an alliance (maps to primary party color)
  */
+const normalizeAlliance = (alliance: string): string => {
+  if (alliance === 'SPA') return 'DMK+';
+  if (alliance === 'NDA') return 'AIADMK+';
+  return alliance;
+};
+
 const getAllianceColor = (alliance: string): string => {
   if (alliance.includes('DMK') && !alliance.includes('AIADMK')) return getPartyColor('DMK');
   if (alliance.includes('AIADMK') || alliance.includes('ADMK')) return getPartyColor('AIADMK');
@@ -69,8 +75,21 @@ const Predictions = () => {
         predictionsAPI.getAll({ year: 2026, limit: 234 }),
       ]);
 
+      // Normalize V4 alliance names (SPA→DMK+, NDA→AIADMK+) to keep display consistent
+      if (summaryData.seat_distribution) {
+        for (const key of Object.keys(summaryData.seat_distribution)) {
+          const normalized = normalizeAlliance(key);
+          if (normalized !== key) {
+            summaryData.seat_distribution[normalized] = summaryData.seat_distribution[key];
+            delete summaryData.seat_distribution[key];
+          }
+        }
+      }
       setSummary(summaryData);
-      setPredictions(predictionsData.predictions);
+      setPredictions(predictionsData.predictions.map(p => ({
+        ...p,
+        predicted_winner_alliance: normalizeAlliance(p.predicted_winner_alliance),
+      })));
     } catch (err) {
       console.error('Error loading predictions:', err);
       setError('Failed to load predictions. Please try again.');

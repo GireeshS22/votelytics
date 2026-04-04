@@ -413,6 +413,26 @@ export const predictionsAPI = {
   },
 
   /**
+   * Get aggregated article data for the prediction analysis page
+   */
+  getArticleData: async (year: number = 2026): Promise<any> => {
+    const cacheKey = `predictions_article_${year}`;
+    const cached = getCached<any>(cacheKey);
+    if (cached) {
+      console.log('✅ Article data loaded from cache');
+      return cached;
+    }
+
+    console.log('🌐 Fetching article data from API...');
+    const response = await apiClient.get('/predictions/article-data', {
+      params: { year }
+    });
+
+    setCached(cacheKey, response.data, CACHE_TTL.ONE_HOUR);
+    return response.data;
+  },
+
+  /**
    * Get comparison between predictions and historical results
    */
   getComparison: async (

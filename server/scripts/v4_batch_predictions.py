@@ -60,41 +60,62 @@ _BASE           = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ALLIANCE_CONFIG = os.path.join(_BASE, "data", "alliance_config_2026.json")
 BATCH_JOBS_FILE = os.path.join(_BASE, "data", "v4_batch_jobs.json")
 
+SYSTEM_PROMPT = (
+    "You are an impartial, data-driven election analyst with no political affiliation "
+    "or bias toward any party, leader, or ideology. Your only goal is to provide "
+    "objective, evidence-based analysis.\n\n"
+    "For the upcoming Tamil Nadu Legislative Assembly election, analyze the supplied "
+    "constituency data and predict the most likely outcome based solely on the "
+    "information provided. Consider:\n"
+    "- Historical vote shares and margins (2011, 2016, 2021)\n"
+    "- Whether the incumbent candidate is re-contesting\n"
+    "- Candidate quality and party strength at the local level\n"
+    "- Four-way vote split dynamics (SPA, NDA, TVK, NTK)\n"
+    "- Observable patterns in the data — do not assume any alliance has a structural advantage\n\n"
+    "You must be equally willing to predict any of the four alliances as the winner. "
+    "Never favour an alliance simply because they are the incumbent or opposition."
+)
+
 
 # ── Prompt builder ─────────────────────────────────────────────────────────────
 
 def build_v4_prompt(constituency_data: dict, candidates: dict) -> str:
     """
-    Lightweight, unbiased prompt — no leading language, no historical framing.
-    Let GPT-5.4 with high reasoning do the analysis.
+    Pure data prompt — no political framing or incumbency bias.
+    System prompt handles the analyst persona and neutrality instructions.
     """
     const = constituency_data["constituency"]
     hist  = constituency_data["historical_results"]
 
     lines = []
-    lines.append(f"CONSTITUENCY: {const['name']} (AC #{const['ac_number']})")
-    lines.append(f"DISTRICT: {const['district']} | REGION: {const['region']}")
+    lines.append("=== CONSTITUENCY DATA ===")
+    lines.append(f"Name: {const['name']} (AC #{const['ac_number']})")
+    region = const.get('region')
+    location = f"District: {const['district']}"
+    if region and region.lower() not in ('unknown', 'none', ''):
+        location += f" | Region: {region}"
+    lines.append(location)
 
     if const.get("population"):
         lines.append(
-            f"DEMOGRAPHICS: Population {const['population']:,} | "
+            f"Demographics: Population {const['population']:,} | "
             f"Urban {const.get('urban_pct') or 0:.1f}% | "
             f"Literacy {const.get('literacy_rate') or 0:.1f}%"
         )
 
-    # Historical results — raw numbers, no interpretation
-    lines.append("\nHISTORICAL ELECTION RESULTS:")
+    lines.append("\n=== HISTORICAL ELECTION RESULTS ===")
     for year in [2021, 2016, 2011]:
         if year not in hist:
             continue
         d = hist[year]
         lines.append(f"\n{year}:")
-        lines.append(f"  Winner: {d['winner']} ({d['winner_alliance']}) — {d['winner_vote_share']:.1f}% | Margin: {d['margin_pct']:.1f}%")
+        winner_candidate = d['top_candidates'][0]['name'] if d.get('top_candidates') else ''
+        winner_str = f"{winner_candidate} ({d['winner']}, {d['winner_alliance']})" if winner_candidate else f"{d['winner']} ({d['winner_alliance']})"
+        lines.append(f"  Winner: {winner_str} — {d['winner_vote_share']:.1f}% | Margin: {d['margin_pct']:.1f}%")
         for alliance, share in list(d["alliance_shares"].items())[:5]:
             lines.append(f"  {alliance}: {share['vote_share']:.1f}%")
 
-    # 2026 candidates — factual only
-    lines.append("\n2026 CANDIDATES:")
+    lines.append("\n=== 2026 CANDIDATES ===")
     for alliance in ["SPA", "NDA", "TVK", "NTK"]:
         c = candidates.get(alliance)
         if c:
@@ -102,41 +123,55 @@ def build_v4_prompt(constituency_data: dict, candidates: dict) -> str:
         else:
             lines.append(f"  {alliance}: TBD")
 
-    lines.append("\nELECTION CONTEXT (April 2026):")
-    lines.append("  - Tamil Nadu state assembly election")
-    lines.append("  - DMK-led SPA is the incumbent government (won 2021)")
-    lines.append("  - Four main alliances: SPA, NDA, TVK, NTK")
-    lines.append("  - TVK is a new party (first election) led by actor Vijay")
-    lines.append("  - NTK contests all 234 seats")
-    lines.append("  - Final candidate lists announced")
+    lines.append("\n=== 2026 ELECTION STRUCTURE ===")
+    lines.append("  - Four alliances contesting: SPA (DMK-led), NDA (AIADMK-led), TVK (Vijay — first election), NTK (Seeman — all 234 seats)")
+    lines.append("  - Vote split across four alliances is a key variable in every constituency")
+    lines.append("  - Candidate incumbency: check if 2021 winner is re-contesting above")
 
     lines.append("""
-Predict the 2026 election outcome for this specific constituency.
-Return ONLY valid JSON, no markdown:
+=== TASK ===
+Based solely on the data above, reason through the following steps before predicting:
+
+Step 1 — Key Objective Factors:
+  • Incumbency: is the 2021 winning candidate re-contesting in 2026?
+  • Party continuity / change across 2011, 2016, 2021
+  • Historical swing patterns and margin trends
+  • Any observable data patterns (e.g., dominant alliance, consistent margins, major party switches)
+
+Step 2 — Analysis & Reasoning:
+  Strictly based on provided data only. Factual and neutral. Consider the four-way vote split (SPA/NDA/TVK/NTK) and how it affects the outcome.
+
+Step 3 — Most Likely Outcome:
+  State the predicted winner with a short justification. Use phrases like:
+  "Strongly favoured", "Highly competitive", "Advantage to X due to incumbency",
+  "Too close to call", "NDA benefits from anti-incumbency split"
+  Never declare a certain win unless the data makes it obvious.
+
+After completing the above reasoning, output ONLY valid JSON (no markdown, no extra text):
 
 {
-  "predicted_winner_alliance": "SPA",
-  "predicted_winner_party": "DMK",
-  "predicted_winner_candidate": "Candidate Name",
-  "confidence_level": "Safe",
-  "win_probability": 0.78,
-  "predicted_vote_share": 47.2,
-  "predicted_margin_pct": 10.5,
+  "predicted_winner_alliance": "<SPA|NDA|TVK|NTK>",
+  "predicted_winner_party": "<party name>",
+  "predicted_winner_candidate": "<candidate name>",
+  "confidence_level": "<Safe|Likely|Lean|Toss-up>",
+  "win_probability": 0.00,
+  "predicted_vote_share": 0.0,
+  "predicted_margin_pct": 0.0,
   "top_alliances": [
-    {"alliance": "SPA",  "party": "DMK",    "candidate": "Name", "vote_share": 47.2},
-    {"alliance": "NDA",  "party": "AIADMK", "candidate": "Name", "vote_share": 36.7},
-    {"alliance": "TVK",  "party": "TVK",    "candidate": "Name", "vote_share": 11.3},
-    {"alliance": "NTK",  "party": "NTK",    "candidate": "Name", "vote_share": 4.8}
+    {"alliance": "SPA",  "party": "<party>", "candidate": "<name>", "vote_share": 0.0},
+    {"alliance": "NDA",  "party": "<party>", "candidate": "<name>", "vote_share": 0.0},
+    {"alliance": "TVK",  "party": "TVK",     "candidate": "<name>", "vote_share": 0.0},
+    {"alliance": "NTK",  "party": "NTK",     "candidate": "<name>", "vote_share": 0.0}
   ],
-  "candidate_factor": "positive",
-  "swing_from_2021": -2.1,
-  "key_factors": "Concise analysis of why this outcome is predicted",
-  "visualization_tags": ["safe_seat", "urban", "incumbent_advantage"]
+  "candidate_factor": "<positive|neutral|negative>",
+  "swing_from_2021": 0.0,
+  "key_factors": "<your Step 2 analysis as a detailed multi-sentence paragraph>",
+  "visualization_tags": ["<tag1>", "<tag2>"]
 }
 
-confidence_level must be one of: Safe, Likely, Lean, Toss-up
-candidate_factor must be one of: positive, neutral, negative
-visualization_tags: pick relevant tags from [safe_seat, marginal, toss_up, urban, rural, semi_urban,
+confidence_level: Safe = near-certain, Likely = strong advantage, Lean = slight edge, Toss-up = too close to call
+candidate_factor: impact of the specific candidate vs alliance baseline (positive/neutral/negative)
+visualization_tags — pick all that apply: [safe_seat, marginal, toss_up, urban, rural, semi_urban,
   incumbent_advantage, anti_incumbency, star_candidate, weak_candidate, caste_factor,
   minority_factor, youth_vote, split_vote, tvk_factor, nda_consolidation]
 """)
@@ -260,7 +295,8 @@ def submit_batch(sample: int | None, db: Session, client: OpenAI):
                 "model":     MODEL,
                 "reasoning": {"effort": "high"},
                 "input": [
-                    {"role": "user", "content": prompt}
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user",   "content": prompt}
                 ],
             },
         }

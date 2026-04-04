@@ -17,6 +17,7 @@ const Analysis              = lazy(() => import('./pages/Analysis'));
 const SwingAnalysis         = lazy(() => import('./pages/SwingAnalysis'));
 const BastionAnalysis       = lazy(() => import('./pages/BastionAnalysis'));
 const Predictions           = lazy(() => import('./pages/Predictions'));
+const PredictionArticle     = lazy(() => import('./pages/PredictionArticle'));
 const VoteResults           = lazy(() => import('./pages/VoteResults'));
 const Terms                 = lazy(() => import('./pages/Terms'));
 const About                 = lazy(() => import('./pages/About'));
@@ -61,6 +62,7 @@ function App() {
           <Route element={<MainLayout />}>
             <Route path="/"                    element={<Home />} />
             <Route path="/predictions"         element={<Predictions />} />
+            <Route path="/predictions/analysis" element={<PredictionArticle />} />
             <Route path="/analysis"            element={<Analysis />} />
             <Route path="/analysis/swing"      element={<SwingAnalysis />} />
             <Route path="/analysis/bastion"    element={<BastionAnalysis />} />

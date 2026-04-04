@@ -21,6 +21,7 @@ function ConstituencyDetail() {
   const [prediction, setPrediction] = useState<PredictionDetail | null>(null);
   const [previousPrediction, setPreviousPrediction] = useState<PredictionDetail | null>(null);
   const [v1Prediction, setV1Prediction] = useState<PredictionDetail | null>(null);
+  const [v2Prediction, setV2Prediction] = useState<PredictionDetail | null>(null);
   const [results2021, setResults2021] = useState<ElectionResult[]>([]);
   const [results2016, setResults2016] = useState<ElectionResult[]>([]);
   const [results2011, setResults2011] = useState<ElectionResult[]>([]);
@@ -98,13 +99,13 @@ function ConstituencyDetail() {
         setPrediction(predictionData.prediction);
         setPreviousPrediction(predictionData.previous_prediction || null);
 
-        // Fetch V1 separately for 3-point trend chart
-        try {
-          const v1Data = await predictionsAPI.getByConstituency(constituencyData.id, 2026, false, 1);
-          setV1Prediction(v1Data.prediction || null);
-        } catch {
-          setV1Prediction(null);
-        }
+        // Fetch V1 and V2 separately for 4-point trend chart
+        const [v1Data, v2Data] = await Promise.allSettled([
+          predictionsAPI.getByConstituency(constituencyData.id, 2026, false, 1),
+          predictionsAPI.getByConstituency(constituencyData.id, 2026, false, 2),
+        ]);
+        setV1Prediction(v1Data.status === 'fulfilled' ? v1Data.value.prediction || null : null);
+        setV2Prediction(v2Data.status === 'fulfilled' ? v2Data.value.prediction || null : null);
       } catch (predErr) {
         console.log('No prediction found for this constituency');
         setPrediction(null);
@@ -160,7 +161,8 @@ function ConstituencyDetail() {
 
   // Generate SEO data dynamically based on constituency and prediction
   const hasPrediction = prediction !== null;
-  const predictedWinner = prediction?.predicted_winner_alliance;
+  const normalizeAlliance = (a?: string) => a === 'SPA' ? 'DMK+' : a === 'NDA' ? 'AIADMK+' : a;
+  const predictedWinner = normalizeAlliance(prediction?.predicted_winner_alliance);
 
   const seoData = getConstituencySEO(
     constituency.name,
@@ -216,6 +218,7 @@ function ConstituencyDetail() {
             prediction={prediction}
             previousPrediction={previousPrediction}
             v1Prediction={v1Prediction}
+            v2Prediction={v2Prediction}
             candidates={candidates}
           />
         )}
