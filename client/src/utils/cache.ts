@@ -5,7 +5,7 @@
 
 // Cache version - increment this when database schema/data changes
 // This will invalidate all old cache automatically
-const CACHE_VERSION = 3; // Incremented after adding slug field to constituencies
+const CACHE_VERSION = 4; // Incremented after dropping geojson from /constituencies/ list
 
 interface CacheItem<T> {
   data: T;
@@ -114,6 +114,7 @@ export function getCacheSize(): number {
 // Cache key constants
 export const CACHE_KEYS = {
   CONSTITUENCIES: 'votelytics:constituencies',
+  BOUNDARIES: 'votelytics:boundaries',
   WINNERS_2021: 'votelytics:winners:2021',
   WINNERS_2016: 'votelytics:winners:2016',
   CONSTITUENCY_PREFIX: 'votelytics:constituency:',
