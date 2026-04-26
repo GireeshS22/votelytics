@@ -19,6 +19,8 @@ from app.cache import get_or_compute
 # Past-election analysis is fully deterministic — cache for 24h.
 _ANALYSIS_TTL = 86400
 
+router = APIRouter()
+
 
 @router.get("/", response_model=List[ElectionResponse])
 @limiter.limit(settings.RATE_LIMIT_PUBLIC)

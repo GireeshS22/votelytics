@@ -18,6 +18,8 @@ from app.cache import get_or_compute
 # We always resolve "latest version" first and key by the resolved int.
 _PRED_TTL = 86400
 
+router = APIRouter()
+
 
 def get_latest_version(db: Session, year: int) -> int:
     """Get the latest prediction version for a given year"""
