@@ -1,5 +1,5 @@
 """API endpoints for constituencies"""
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import re
@@ -20,10 +20,51 @@ from app.config import settings
 router = APIRouter()
 
 
+# Columns for the list endpoint — geojson is intentionally excluded.
+# It is ~2.9 KB per row × 234 rows = ~680 KB per request, and almost no
+# caller of GET /constituencies/ actually uses it. The map page fetches
+# polygons separately from /constituencies/boundaries.
+_LIST_COLUMNS = (
+    Constituency.id,
+    Constituency.ac_number,
+    Constituency.name,
+    Constituency.code,
+    Constituency.slug,
+    Constituency.district,
+    Constituency.region,
+    Constituency.population,
+    Constituency.urban_population_pct,
+    Constituency.literacy_rate,
+    Constituency.extra_data,
+    Constituency.created_at,
+    Constituency.updated_at,
+)
+
+
+def _row_to_dict(row) -> dict:
+    return {
+        "id": row.id,
+        "ac_number": row.ac_number,
+        "name": row.name,
+        "code": row.code,
+        "slug": row.slug,
+        "district": row.district,
+        "region": row.region,
+        "population": row.population,
+        "urban_population_pct": row.urban_population_pct,
+        "literacy_rate": row.literacy_rate,
+        "extra_data": row.extra_data,
+        "geojson": None,
+        "created_at": row.created_at,
+        "updated_at": row.updated_at,
+    }
+
+
 @router.get("/", response_model=ConstituencyList)
 @limiter.limit(settings.RATE_LIMIT_PUBLIC)
 async def get_constituencies(
     request: Request,
+    response: Response,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     district: Optional[str] = None,
@@ -31,32 +72,66 @@ async def get_constituencies(
     db: Session = Depends(get_db),
 ):
     """
-    Get list of all constituencies with optional filters
+    Get list of all constituencies with optional filters.
 
-    - **skip**: Number of records to skip (pagination)
-    - **limit**: Maximum number of records to return
-    - **district**: Filter by district name
-    - **region**: Filter by region (North, South, Central, West)
+    Note: `geojson` is always null on this endpoint. Fetch boundaries
+    from `/constituencies/boundaries` (cached separately).
 
     **Rate limit**: 100 requests per minute
     """
-    query = db.query(Constituency)
+    query = db.query(*_LIST_COLUMNS)
 
-    # Apply filters
     if district:
         query = query.filter(Constituency.district == district)
     if region:
         query = query.filter(Constituency.region == region)
 
-    # Get total count
     total = query.count()
+    rows = query.offset(skip).limit(limit).all()
 
-    # Apply pagination
-    constituencies = query.offset(skip).limit(limit).all()
-
+    response.headers["Cache-Control"] = "public, max-age=3600, s-maxage=3600"
     return {
-        "constituencies": constituencies,
+        "constituencies": [_row_to_dict(r) for r in rows],
         "total": total,
+    }
+
+
+@router.get("/boundaries")
+async def get_constituencies_boundaries(
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """
+    Return GeoJSON polygons for all constituencies in a single response.
+
+    Cached for 24h via Cache-Control so browsers and any CDN serve it
+    without hitting Supabase. Constituency boundaries do not change.
+    """
+    rows = (
+        db.query(
+            Constituency.id,
+            Constituency.ac_number,
+            Constituency.name,
+            Constituency.slug,
+            Constituency.geojson,
+        )
+        .order_by(Constituency.ac_number)
+        .all()
+    )
+
+    response.headers["Cache-Control"] = "public, max-age=86400, s-maxage=86400"
+    return {
+        "boundaries": [
+            {
+                "id": r.id,
+                "ac_number": r.ac_number,
+                "name": r.name,
+                "slug": r.slug,
+                "geojson": r.geojson,
+            }
+            for r in rows
+            if r.geojson is not None
+        ]
     }
 
 

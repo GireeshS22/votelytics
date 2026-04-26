@@ -1,5 +1,5 @@
 """API endpoints for elections and results"""
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 from collections import defaultdict
@@ -14,8 +14,10 @@ from app.schemas.election import (
 )
 from app.config import settings
 from app.rate_limiters import limiter
+from app.cache import get_or_compute
 
-router = APIRouter()
+# Past-election analysis is fully deterministic — cache for 24h.
+_ANALYSIS_TTL = 86400
 
 
 @router.get("/", response_model=List[ElectionResponse])
@@ -54,6 +56,7 @@ async def get_elections(
 
 @router.get("/bastion-seats-three-elections")
 def get_bastion_seats_three_elections(
+    response: Response,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """
@@ -62,6 +65,15 @@ def get_bastion_seats_three_elections(
 
     This shows true party strongholds that have been consistent for 10 years
     """
+    response.headers["Cache-Control"] = "public, max-age=86400, s-maxage=86400"
+    return get_or_compute(
+        "bastion-seats-three-elections",
+        _ANALYSIS_TTL,
+        lambda: _compute_bastion_seats_three_elections(db),
+    )
+
+
+def _compute_bastion_seats_three_elections(db: Session) -> Dict[str, Any]:
     # Get elections for all three years
     election_2011 = db.query(Election).filter(Election.year == 2011).first()
     election_2016 = db.query(Election).filter(Election.year == 2016).first()
@@ -214,6 +226,7 @@ def get_election(election_id: int, db: Session = Depends(get_db)):
 @limiter.limit(settings.RATE_LIMIT_HEAVY)
 async def get_election_results(
     request: Request,
+    response: Response,
     election_id: int,
     skip: int = Query(0, ge=0),
     limit: int = Query(234, ge=1, le=500),
@@ -230,22 +243,35 @@ async def get_election_results(
 
     **Rate limit**: 20 requests per minute (heavy query)
     """
-    # Check if election exists
+    response.headers["Cache-Control"] = "public, max-age=86400, s-maxage=86400"
+
+    cache_key = f"election-results:{election_id}:{party or ''}:{int(winner_only)}:{skip}:{limit}"
+    return get_or_compute(
+        cache_key,
+        _ANALYSIS_TTL,
+        lambda: _fetch_election_results(db, election_id, party, winner_only, skip, limit),
+    )
+
+
+def _fetch_election_results(
+    db: Session,
+    election_id: int,
+    party: Optional[str],
+    winner_only: bool,
+    skip: int,
+    limit: int,
+) -> List[ElectionResult]:
     election = db.query(Election).filter(Election.id == election_id).first()
     if not election:
         raise HTTPException(status_code=404, detail="Election not found")
 
     query = db.query(ElectionResult).filter(ElectionResult.election_id == election_id)
-
-    # Apply filters
     if party:
         query = query.filter(ElectionResult.party == party)
     if winner_only:
         query = query.filter(ElectionResult.is_winner == 1)
 
-    results = query.offset(skip).limit(limit).all()
-
-    return results
+    return query.offset(skip).limit(limit).all()
 
 
 @router.get("/constituency/{constituency_id}/history", response_model=List[ElectionResultResponse])
@@ -305,16 +331,22 @@ def get_results_by_year(
 def get_bastion_seats(
     from_year: int,
     to_year: int,
+    response: Response,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """
     Get bastion seats analysis - constituencies held by the same party
     with strong margins across two elections
-
-    Bastion seats are identified by:
-    - Same party winning in both elections
-    - Strong winning margin in the most recent election
     """
+    response.headers["Cache-Control"] = "public, max-age=86400, s-maxage=86400"
+    return get_or_compute(
+        f"bastion-seats:{from_year}:{to_year}",
+        _ANALYSIS_TTL,
+        lambda: _compute_bastion_seats(db, from_year, to_year),
+    )
+
+
+def _compute_bastion_seats(db: Session, from_year: int, to_year: int) -> Dict[str, Any]:
     # Get elections for both years
     election_from = db.query(Election).filter(Election.year == from_year).first()
     election_to = db.query(Election).filter(Election.year == to_year).first()
@@ -419,17 +451,21 @@ def get_bastion_seats(
 def get_swing_analysis(
     from_year: int,
     to_year: int,
+    response: Response,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """
     Get swing analysis comparing two elections
-
-    Returns:
-    - Constituencies that flipped parties
-    - Party-wise seat gains/losses
-    - Margin changes
-    - Overall statistics
     """
+    response.headers["Cache-Control"] = "public, max-age=86400, s-maxage=86400"
+    return get_or_compute(
+        f"swing-analysis:{from_year}:{to_year}",
+        _ANALYSIS_TTL,
+        lambda: _compute_swing_analysis(db, from_year, to_year),
+    )
+
+
+def _compute_swing_analysis(db: Session, from_year: int, to_year: int) -> Dict[str, Any]:
     # Get elections for both years
     election_from = db.query(Election).filter(Election.year == from_year).first()
     election_to = db.query(Election).filter(Election.year == to_year).first()

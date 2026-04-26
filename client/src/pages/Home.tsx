@@ -58,22 +58,24 @@ function Home() {
     try {
       setLoading(true);
 
-      // Fetch constituencies and winners for selected election in parallel
-      const [constituenciesData, winners] = await Promise.all([
+      // Fetch constituencies, winners, and map boundaries in parallel.
+      // Boundaries are a separate (heavy) endpoint cached for 24h so most
+      // page loads serve them from localStorage and never hit Supabase.
+      const [constituenciesData, winners, boundaries] = await Promise.all([
         constituenciesAPI.getAll({ limit: 500 }),
-        electionsAPI.getResults(electionId, { winner_only: true, limit: 500 })
+        electionsAPI.getResults(electionId, { winner_only: true, limit: 500 }),
+        constituenciesAPI.getBoundaries(),
       ]);
 
-      // Create a map of constituency_id to winner
       const winnerMap = new Map<number, ElectionResult>();
       winners.forEach(winner => {
         winnerMap.set(winner.constituency_id, winner);
       });
 
-      // Merge constituencies with winners
       const merged = constituenciesData.constituencies.map(constituency => ({
         ...constituency,
-        winner: winnerMap.get(constituency.id)
+        geojson: boundaries.get(constituency.id) ?? null,
+        winner: winnerMap.get(constituency.id),
       }));
 
       setConstituencies(merged);

@@ -125,6 +125,27 @@ export const constituenciesAPI = {
   },
 
   /**
+   * Get GeoJSON polygons for all constituencies in one call.
+   * Heavy payload (~700KB) — cached locally for 24h. Used only by the map.
+   */
+  getBoundaries: async (): Promise<Map<number, GeoJSON.Feature>> => {
+    const cached = getCached<Array<{ id: number; geojson: GeoJSON.Feature }>>(CACHE_KEYS.BOUNDARIES);
+    if (cached) {
+      console.log('✅ Boundaries loaded from cache');
+      return new Map(cached.map((b) => [b.id, b.geojson]));
+    }
+
+    console.log('🌐 Fetching constituency boundaries from API...');
+    const response = await apiClient.get<{
+      boundaries: Array<{ id: number; ac_number: number; name: string; slug: string | null; geojson: GeoJSON.Feature }>;
+    }>('/constituency/boundaries');
+
+    const minimal = response.data.boundaries.map((b) => ({ id: b.id, geojson: b.geojson }));
+    setCached(CACHE_KEYS.BOUNDARIES, minimal, CACHE_TTL.ONE_DAY);
+    return new Map(minimal.map((b) => [b.id, b.geojson]));
+  },
+
+  /**
    * Get 2026 candidates for a constituency
    */
   getCandidates: async (constituencyId: number, electionYear = 2026): Promise<Candidate2026[]> => {

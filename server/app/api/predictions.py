@@ -1,7 +1,7 @@
 """
 API endpoints for election predictions
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func, cast, Text
 from typing import List, Optional
@@ -12,8 +12,11 @@ from app.models.prediction import Prediction
 from app.models.constituency import Constituency
 from app.models.election import ElectionResult
 from app.models.candidate import Candidate
+from app.cache import get_or_compute
 
-router = APIRouter()
+# Predictions for a (year, version) pair never change — cache for 24h.
+# We always resolve "latest version" first and key by the resolved int.
+_PRED_TTL = 86400
 
 
 def get_latest_version(db: Session, year: int) -> int:
@@ -46,6 +49,7 @@ def reclassify_confidence_level(win_probability: float, margin_pct: float) -> st
 
 @router.get("/summary")
 async def get_predictions_summary(
+    response: Response,
     year: int = Query(default=2026, description="Election year"),
     version: Optional[int] = Query(default=None, description="Prediction version (latest if not specified)"),
     db: Session = Depends(get_db)
@@ -54,10 +58,16 @@ async def get_predictions_summary(
     Get summary of predictions by alliance and confidence level
     Used for bar chart and summary cards
     """
-    # Get version (latest if not specified)
     pred_version = version if version is not None else get_latest_version(db, year)
+    response.headers["Cache-Control"] = "public, max-age=3600, s-maxage=3600"
+    return get_or_compute(
+        f"predictions-summary:{year}:{pred_version}",
+        _PRED_TTL,
+        lambda: _compute_predictions_summary(db, year, pred_version),
+    )
 
-    # Get all predictions for the year and version
+
+def _compute_predictions_summary(db: Session, year: int, pred_version: int) -> dict:
     predictions = db.query(Prediction).filter(
         Prediction.predicted_year == year,
         Prediction.version == pred_version
@@ -136,6 +146,7 @@ async def get_predictions_summary(
 
 @router.get("/")
 async def get_all_predictions(
+    response: Response,
     year: int = Query(default=2026),
     version: Optional[int] = Query(default=None, description="Prediction version (latest if not specified)"),
     alliance: Optional[str] = Query(default=None),
@@ -149,9 +160,34 @@ async def get_all_predictions(
     """
     Get all predictions with optional filtering
     """
-    # Get version (latest if not specified)
     pred_version = version if version is not None else get_latest_version(db, year)
+    response.headers["Cache-Control"] = "public, max-age=3600, s-maxage=3600"
 
+    cache_key = (
+        f"predictions-all:{year}:{pred_version}:{alliance or ''}:"
+        f"{confidence_level or ''}:{region or ''}:{district or ''}:{limit}:{offset}"
+    )
+    return get_or_compute(
+        cache_key,
+        _PRED_TTL,
+        lambda: _compute_all_predictions(
+            db, year, pred_version, alliance, confidence_level,
+            region, district, limit, offset,
+        ),
+    )
+
+
+def _compute_all_predictions(
+    db: Session,
+    year: int,
+    pred_version: int,
+    alliance: Optional[str],
+    confidence_level: Optional[str],
+    region: Optional[str],
+    district: Optional[str],
+    limit: int,
+    offset: int,
+) -> dict:
     # Base query joining with constituencies
     query = db.query(
         Prediction,
@@ -345,6 +381,7 @@ async def get_constituency_prediction(
 
 @router.get("/regional-summary")
 async def get_regional_summary(
+    response: Response,
     year: int = Query(default=2026),
     version: Optional[int] = Query(default=None, description="Prediction version (latest if not specified)"),
     db: Session = Depends(get_db)
@@ -352,10 +389,16 @@ async def get_regional_summary(
     """
     Get predictions summary by region
     """
-    # Get version (latest if not specified)
     pred_version = version if version is not None else get_latest_version(db, year)
+    response.headers["Cache-Control"] = "public, max-age=3600, s-maxage=3600"
+    return get_or_compute(
+        f"predictions-regional:{year}:{pred_version}",
+        _PRED_TTL,
+        lambda: _compute_regional_summary(db, year, pred_version),
+    )
 
-    # Get all predictions with constituencies
+
+def _compute_regional_summary(db: Session, year: int, pred_version: int) -> dict:
     predictions = db.query(
         Prediction,
         Constituency.region
@@ -507,6 +550,7 @@ async def get_available_versions(
 
 @router.get("/article-data")
 async def get_article_data(
+    response: Response,
     year: int = Query(default=2026),
     db: Session = Depends(get_db)
 ):
@@ -515,7 +559,15 @@ async def get_article_data(
     Returns everything needed in one call.
     """
     pred_version = get_latest_version(db, year)
+    response.headers["Cache-Control"] = "public, max-age=3600, s-maxage=3600"
+    return get_or_compute(
+        f"predictions-article:{year}:{pred_version}",
+        _PRED_TTL,
+        lambda: _compute_article_data(db, year, pred_version),
+    )
 
+
+def _compute_article_data(db: Session, year: int, pred_version: int) -> dict:
     # Load all predictions with constituency info
     rows = (
         db.query(Prediction, Constituency)
